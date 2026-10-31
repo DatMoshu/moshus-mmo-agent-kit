@@ -1,0 +1,40 @@
+# stdb.lock - the single source of truth for versions in this kit (and in games scaffolded from it).
+# tools/kit.py reads this file. Never float "latest": bump here, run `python tools/kit.py doctor`,
+# rebuild, regenerate bindings, re-run smoke + load gates, then commit the bump.
+
+[spacetimedb]
+version = "2.14.0"            # CLI + standalone server + module crate + client SDKs move together
+rust_crate = "=2.14.0"        # templates/server/*/Cargo.toml
+npm_sdk = "2.14.0"            # tools/loadtest/bots, templates/web-admin
+release_url = "https://github.com/clockworklabs/SpacetimeDB/releases/tag/v2.14.0"
+license = "BSL-1.1 (server); Apache-2.0 (SDKs, bindings crates, templates, codex-plugin skills)"
+
+[toolchain]
+rust = "1.97.1"               # the toolchain this kit builds and tests with; pinned via rust-toolchain.toml
+rust_target = "wasm32-unknown-unknown"
+node = ">=22"
+python = ">=3.11"             # tools use tomllib
+godot = "4.6.3"
+
+[godot_sdk]
+name = "flametime/Godot-SpacetimeDB-SDK"
+license = "MIT"
+plugin_version = "0.3.2"      # addons/SpacetimeDB/plugin.cfg of the vendored copy
+url = "https://github.com/flametime/Godot-SpacetimeDB-SDK"
+vendored_at = "templates/client/godot/addons/SpacetimeDB"
+
+[official_skills]
+source = "https://github.com/clockworklabs/SpacetimeDB/tree/master/codex-plugin/plugins/spacetimedb/skills"
+license = "Apache-2.0"
+vendored_at = "skills/vendor/official"
+fetched = "2026-10-30"
+
+[dev]
+url = "http://127.0.0.1:3000"   # `spacetime start` default
+database = "mmo-dev"
+module = "templates/server/rust-single"
+
+# What was actually exercised, where, and how (see docs/VERIFICATION.md for the full log).
+[tested]
+"linux-x86_64" = "spacetimedb 2.14.0 standalone + CLI, rust 1.97.1 wasm32, node 24, godot 4.6.3 headless; 2026-10-30"
+"windows-x86_64" = "see docs/VERIFICATION.md"

@@ -1,0 +1,24 @@
+# build output
+target/
+node_modules/
+dist/
+*.wasm
+# local kit state (isolated server data, fetched schemas)
+.kit/
+# Godot editor cache
+.godot/
+# load-test output
+reports/
+# secrets never belong in this repo
+.env
+.env.*
+*.token
+*.pem
+*.key
+# OS / editor
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+__pycache__/
+.claude/

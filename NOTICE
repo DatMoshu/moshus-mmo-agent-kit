@@ -1,0 +1,32 @@
+Moshu's MMO Agent Kit
+Copyright 2026 Moshu Arends and contributors
+
+Licensed under the Apache License, Version 2.0 (see LICENSE).
+
+This product includes third-party material:
+
+1. SpacetimeDB official agent skills
+   Path:    skills/vendor/official/
+   Source:  https://github.com/clockworklabs/SpacetimeDB (codex-plugin/plugins/spacetimedb/skills)
+   License: Apache License 2.0 (copy in skills/vendor/official/LICENSE)
+   Copyright Clockwork Laboratories, Inc. Files are unmodified; refresh with
+   `python tools/kit.py vendor-skills`.
+
+2. Godot SpacetimeDB SDK
+   Path:    templates/client/godot/addons/SpacetimeDB/
+   Source:  https://github.com/flametime/Godot-SpacetimeDB-SDK
+   License: MIT (copy in templates/client/godot/addons/SpacetimeDB/LICENSE)
+   Copyright (c) 2025 flametime
+
+3. Ideas, not code, from BitCraftPublic
+   Source:  https://github.com/clockworklabs/BitCraftPublic (Apache License 2.0)
+   Some architecture notes (global + region databases, agent/scheduled-reducer
+   patterns, handoff) are described in our own words. No BitCraft code is included.
+
+SpacetimeDB itself (the server/host) is NOT included in this repository. It is licensed
+separately under the Business Source License 1.1 by Clockwork Laboratories, Inc.
+Read docs/legal/LICENSING.md (not legal advice) before you ship.
+
+"SpacetimeDB" is a trademark of Clockwork Laboratories, Inc. This kit is an independent
+community project and is not affiliated with or endorsed by Clockwork Laboratories.
+Godot is a trademark of the Godot Foundation. Other names belong to their owners.

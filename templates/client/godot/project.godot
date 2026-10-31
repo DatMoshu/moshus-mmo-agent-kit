@@ -1,0 +1,28 @@
+; Moshu's MMO Agent Kit - Godot starter client (Godot 4.6.x)
+config_version=5
+
+[application]
+
+config/name="MMO Kit Starter"
+run/main_scene="res://scenes/main.tscn"
+config/features=PackedStringArray("4.6", "GL Compatibility")
+config/icon="res://icon.svg"
+
+[autoload]
+
+SpacetimeDB="*res://spacetime_bindings/schema/spacetime_autoload.gd"
+Net="*res://net/net_session.gd"
+
+[display]
+
+window/size/viewport_width=960
+window/size/viewport_height=640
+
+[editor_plugins]
+
+enabled=PackedStringArray("res://addons/SpacetimeDB/plugin.cfg")
+
+[rendering]
+
+renderer/rendering_method="gl_compatibility"
+renderer/rendering_method.mobile="gl_compatibility"

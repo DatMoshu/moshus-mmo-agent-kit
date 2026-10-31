@@ -1,0 +1,12 @@
+{
+  "_comment": "Gate thresholds for `python tools/kit.py loadtest`. dir=max means lower is better. Tune per game; keep the defaults strict for a 20 Hz movement tick. Numbers are per region database.",
+  "metrics": {
+    "reducer_errors":            { "dir": "max", "warn": 0,     "fail": 10,    "why": "reducers should not fail under normal load" },
+    "connect_failures":          { "dir": "max", "warn": 0,     "fail": 1,     "why": "every bot must connect" },
+    "reducer_p95_ms":            { "dir": "max", "warn": 50,    "fail": 150,   "why": "input -> commit latency players feel" },
+    "reducer_p99_ms":            { "dir": "max", "warn": 120,   "fail": 400,   "why": "tail latency; spikes read as rubber-banding" },
+    "tick_health.avg_lateness_us": { "dir": "max", "warn": 12500, "fail": 25000, "why": "scheduler lateness vs a 50 ms tick: >25% warn, >50% fail" },
+    "tick_health.level":         { "dir": "max", "warn": 1,     "fail": 2,     "why": "module self-reported degradation level" },
+    "updates_per_bot_per_sec":   { "dir": "max", "warn": 2000,  "fail": 10000, "why": "AOI fan-out per client; past this, quantize, shrink AOI, or lower send rate" }
+  }
+}

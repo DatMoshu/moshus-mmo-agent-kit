@@ -1,0 +1,20 @@
+{
+  "name": "mmo-kit-bots",
+  "private": true,
+  "version": "0.1.0",
+  "license": "Apache-2.0",
+  "type": "module",
+  "description": "Headless SpacetimeDB bot clients for smoke tests and load tests (Moshu's MMO Agent Kit).",
+  "scripts": {
+    "smoke": "tsx src/main.ts --mode smoke",
+    "swarm": "tsx src/main.ts --mode swarm"
+  },
+  "dependencies": {
+    "spacetimedb": "2.14.0"
+  },
+  "devDependencies": {
+    "tsx": "4.20.6",
+    "typescript": "5.9.3",
+    "@types/node": "22.18.0"
+  }
+}

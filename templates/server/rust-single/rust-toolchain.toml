@@ -1,0 +1,5 @@
+[toolchain]
+# SpacetimeDB 2.13+ Rust modules need Rust 1.97 or newer (see stdb.lock).
+channel = "1.97.1"
+targets = ["wasm32-unknown-unknown"]
+profile = "minimal"
