@@ -43,7 +43,7 @@ until activation.
 
 **Client flow:** subscribe to `my_player` and `my_departure` in the current region. When `my_departure`
 gets a row, look up `to_region` in global `region.database_name`, connect there with the same token,
-and wait until `my_player.state == 0` (Active). See `recipes/` for client code.
+and wait until `my_player.state == 0` (Active). Working client: `client-example/src/hop.ts` (walkthrough in `recipes/region-handoff-client.md`).
 
 ## IDC rules this template follows
 

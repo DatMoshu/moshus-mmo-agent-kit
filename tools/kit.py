@@ -393,7 +393,7 @@ def cmd_check(args) -> int:
     catalog = json.loads((ROOT / "rules" / "hallucinations.json").read_text(encoding="utf-8"))
     paths = [Path(p) for p in (args.paths or ["."])]
     exts = {".rs", ".ts", ".tsx", ".js", ".cs", ".gd", ".cpp", ".h", ".md", ".toml", ".json", ".py", ".sh", ".ps1", ".yml", ".yaml"}
-    skip = {"node_modules", "target", ".git", ".godot", "module_bindings", "spacetime_bindings", "vendor", "addons", ".kit", "samples"}
+    skip = {"node_modules", "target", ".git", ".godot", "module_bindings", "spacetime_bindings", "vendor", "addons", ".kit", "samples", "kb"}
     hits = 0
     for base in paths:
         files = [base] if base.is_file() else [p for p in base.rglob("*") if p.is_file() and p.suffix in exts and not (set(p.parts) & skip)]

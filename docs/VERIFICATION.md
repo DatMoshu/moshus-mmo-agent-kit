@@ -141,3 +141,18 @@ compiled and smoke-tested headlessly with plain .NET in CI, while the MonoBehavi
 produced complete trees for all four combinations tried. For `--server ts-single --client web-admin --sidecar`:
 `npm install`, then `kit.py publish` → `kit.py bindings` → `kit.py smoke` gave **SMOKE PASS**, and `npm run build` of the client passed.
 Fixed during this check: `bindings` no longer fails when the project has no Godot client.
+
+## 2026-10-31: sharded region-hop client (local 2.14)
+
+* `templates/server/rust-sharded/client-example`: `tsc --noEmit` reported no errors. Ran `npx tsx src/hop.ts --global <global-db> --hops 2` against one global and three region databases, with output **HOP PASS**: two cross-database handoffs, the client reconnected with the same token each time, and the identity stayed the same.
+
+## 2026-10-31: recipe snippets (local 2.14)
+
+Each snippet in `recipes/snippets/*.rs` was appended to a scratch copy of `rust-single`, built for wasm32, and published to a scratch database.
+
+| Snippet | Result |
+|---|---|
+| `inventory.rs` | Compiled. A max stack of 20 with a grant of 45, then a grant of 5, gave stacks 20/20/10. `give_item` out of range was rejected with "too far". **Not run:** a successful give between two players. |
+| `idempotent.rs` | Compiled. Calling `grant_purchase` twice with the same request id applied once. |
+| `chat.rs` | Compiled. With two SDK clients, the second client received the first's message, and a second `say` within 0.5 s was rejected with "slow down". |
+| `operator.rs` | Compiled. With `set_admission_open` switched to `require_operator`, the sidecar (its own token, not the publisher's) ran `--guard --red-level 0 --red-ticks 1`. Before `grant_operator` it got "operator only"; after it, "admission closed", and `admission_open` became false. This also verifies the sidecar guard success path. |

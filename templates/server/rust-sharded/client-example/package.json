@@ -1,0 +1,10 @@
+{
+  "name": "mmo-sharded-client-example",
+  "private": true,
+  "version": "0.1.0",
+  "license": "Apache-2.0",
+  "type": "module",
+  "scripts": { "hop": "tsx src/hop.ts", "typecheck": "tsc --noEmit" },
+  "dependencies": { "spacetimedb": "2.14.0" },
+  "devDependencies": { "tsx": "4.20.6", "typescript": "5.9.3", "@types/node": "22.18.0" }
+}
