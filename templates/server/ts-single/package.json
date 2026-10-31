@@ -1,0 +1,18 @@
+{
+  "name": "mmo-ts-single",
+  "version": "0.1.0",
+  "private": true,
+  "license": "Apache-2.0",
+  "description": "Moshu's MMO Agent Kit: single-database world module in TypeScript (wire-compatible with rust-single)",
+  "type": "module",
+  "scripts": {
+    "typecheck": "tsc --noEmit",
+    "publish:dev": "spacetime publish mmo-dev --server http://127.0.0.1:3000 --module-path . --yes"
+  },
+  "dependencies": {
+    "spacetimedb": "2.14.0"
+  },
+  "devDependencies": {
+    "typescript": "5.9.3"
+  }
+}

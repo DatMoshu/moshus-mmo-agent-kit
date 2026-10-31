@@ -82,3 +82,16 @@ Lessons recorded from these runs:
 
 Not verified: a real client following `my_departure` to reconnect (recipe only), rust-sharded on Windows
 (same MSVC limit as rust-single), and load across regions.
+
+## 2026-10-31: Linux x86_64 (kit authoring box), `templates/server/ts-single`
+
+| Check | Command | Result |
+|---|---|---|
+| Typecheck | `npm install && npx tsc --noEmit` | OK, 0 errors |
+| Publish (TS bundled by the CLI) | `spacetime publish --module-path templates/server/ts-single` | OK; tick running at level 0 |
+| Two-player smoke, TS SDK (bindings generated from **rust-single**) | `python tools/kit.py smoke --db <ts db>` | **PASS** (reducer p95 about 11 ms) |
+| Two-player smoke, Godot 4.6.3 | `python tools/kit.py smoke --godot --db <ts db>` | **PASS** |
+| Load gate, 50 bots x 10 s | `python tools/kit.py loadtest --bots 50 --duration 10 --db <ts db>` | **PASS**: level 0, avg lateness about 0.2 ms, about 830 row updates per bot per second |
+
+The smoke runs used bindings generated from the Rust module, which confirms the two modules are
+wire-compatible.
