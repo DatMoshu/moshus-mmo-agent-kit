@@ -1,0 +1,5 @@
+upstream: https://github.com/clockworklabs/SpacetimeDB/tree/master/codex-plugin/plugins/spacetimedb/skills
+ref: master @ f7e474f78af0c7d355a56a66b20bc96354dc12fb
+fetched: 2026-10-30
+license: Apache-2.0 (see LICENSE); unmodified copies
+note: master was chosen over the v2.14.0 tag because master's rust-server/typescript-server skills document 2.14 async inter-database calls (outbox tables), which the tag's copies do not. cpp-server, csharp-*, mcp, typescript-client, unity and unreal are identical at both refs.

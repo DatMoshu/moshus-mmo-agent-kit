@@ -1,7 +1,7 @@
 ## Starter scene: WASD/arrow keys move your square; other players appear as they move.
 ## Run two instances (two windows) to see two players moving.
 ## Headless check (used by tools/kit.py godot-smoke):
-##   godot --headless --path . -- --autopilot --url http://127.0.0.1:3000 --db mmo-dev --dir 1,0 --seconds 4
+##   godot --headless --path . -- --autopilot --url http://127.0.0.1:3000 --db mmo-dev --dir 1,0 --seconds 8
 extends Node2D
 
 const SCALE := 4.0
@@ -9,6 +9,8 @@ var _args := {}
 var _peer_first := {} # identity hex -> Vector2 first seen
 var _peer_moved := {} # identity hex -> true once seen moving
 var _started_ms := 0
+var _auto_dir := Vector2i(1, 0)
+var _auto_sign := 1
 
 
 func _ready() -> void:
@@ -44,13 +46,20 @@ func _on_connected(identity_hex: String) -> void:
 	_started_ms = Time.get_ticks_msec()
 	if _args.has("autopilot"):
 		var d: PackedStringArray = String(_args.get("dir", "1,0")).split(",")
-		Net.send_move(Vector2i(int(d[0]), int(d[1])))
+		_auto_dir = Vector2i(int(d[0]), int(d[1]))
+		Net.send_move(_auto_dir)
 
 
 func _process(_delta: float) -> void:
 	if not Net.is_joined:
 		return
 	if _args.has("autopilot"):
+		# Pace back and forth (flip every second) so autopilot clients stay near spawn and
+		# inside each other's area of interest even when they start a few seconds apart.
+		var flip := 1 if ((Time.get_ticks_msec() - _started_ms) / 1000) % 2 == 0 else -1
+		if flip != _auto_sign:
+			_auto_sign = flip
+			Net.send_move(_auto_dir * flip)
 		_autopilot_check()
 	else:
 		var dir := Vector2i(

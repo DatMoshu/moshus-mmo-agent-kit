@@ -20,6 +20,7 @@ Environment:
   SPACETIME       path to the spacetime CLI (default: `spacetime` on PATH)
   SPACETIME_ARGS  extra global CLI args, e.g. "--root-dir .kit/root --config-path .kit/cli.toml"
   GODOT           path to a Godot 4.6.x binary (console build on Windows)
+  KIT_WASM        prebuilt module .wasm to publish/generate from instead of building
 """
 from __future__ import annotations
 
@@ -31,15 +32,18 @@ import shlex
 import shutil
 import sqlite3
 import subprocess
+import tempfile
 import sys
 import tomllib
+import time
 import urllib.request
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
 LOCK = tomllib.loads((ROOT / "stdb.lock").read_text(encoding="utf-8"))
 BOTS = ROOT / "tools" / "loadtest" / "bots"
-GODOT_TEMPLATE = ROOT / "templates" / "client" / "godot"
+GODOT_TEMPLATE = ROOT / LOCK["dev"].get("godot_client", "templates/client/godot")
+WEB_ADMIN = ROOT / LOCK["dev"].get("web_admin", "templates/client/web-admin")
 IS_WIN = os.name == "nt"
 
 
@@ -49,15 +53,25 @@ def say(msg: str) -> None:
 
 def run(cmd: list[str], cwd: Path | None = None, check: bool = True, capture: bool = False) -> subprocess.CompletedProcess:
     say("$ " + " ".join(shlex.quote(str(c)) for c in cmd) + (f"   (in {cwd})" if cwd else ""))
-    return subprocess.run([str(c) for c in cmd], cwd=cwd, check=check, text=True,
-                          capture_output=capture, shell=False)
+    return subprocess.run([str(c) for c in cmd], cwd=cwd, check=check, text=True, encoding="utf-8",
+                          errors="replace", capture_output=capture, shell=False)
 
 
 def which(name: str) -> str | None:
     found = shutil.which(name)
     if not found and IS_WIN:
         found = shutil.which(name + ".cmd") or shutil.which(name + ".exe")
+    if not found and name in ("cargo", "rustup"):
+        cand = Path.home() / ".cargo" / "bin" / (name + (".exe" if IS_WIN else ""))
+        found = str(cand) if cand.exists() else None
     return found
+
+
+def module_source(module: Path) -> list[str]:
+    """--module-path normally; --bin-path when KIT_WASM points at a prebuilt module
+    (e.g. on a machine that can run SpacetimeDB but cannot build Rust)."""
+    wasm = os.environ.get("KIT_WASM")
+    return ["--bin-path", wasm] if wasm else ["--module-path", str(module)]
 
 
 def spacetime() -> list[str]:
@@ -99,7 +113,7 @@ def cmd_doctor(args) -> int:
 
     print(f"stdb.lock wants spacetimedb {want}, rust {LOCK['toolchain']['rust']}, node {LOCK['toolchain']['node']}, godot {LOCK['toolchain']['godot']}")
     try:
-        out = subprocess.run([*spacetime(), "--version"], capture_output=True, text=True).stdout
+        out = subprocess.run([*spacetime(), "--version"], capture_output=True, text=True, encoding="utf-8", errors="replace").stdout
         m = re.search(r"tool version (\d+\.\d+\.\d+)", out) or re.search(r"(\d+\.\d+\.\d+)", out)
         report("spacetime", bool(m) and m.group(1) == want, (m.group(1) if m else out.strip()) +
                ("" if m and m.group(1) == want else f"  -> need {want}: `spacetime version install {want}` then `spacetime version use {want}`, or set SPACETIME"))
@@ -107,24 +121,30 @@ def cmd_doctor(args) -> int:
         report("spacetime", False, str(e))
     cargo = which("cargo")
     if cargo:
-        rv = subprocess.run([cargo, f"+{LOCK['toolchain']['rust']}", "--version"], capture_output=True, text=True)
+        rv = subprocess.run([cargo, f"+{LOCK['toolchain']['rust']}", "--version"], capture_output=True, text=True, encoding="utf-8", errors="replace")
         report("rust", rv.returncode == 0, rv.stdout.strip() or f"toolchain {LOCK['toolchain']['rust']} missing -> `rustup toolchain install {LOCK['toolchain']['rust']} --target wasm32-unknown-unknown`")
         rustup = which("rustup")
         if rustup:
-            tl = subprocess.run([rustup, "target", "list", "--installed", "--toolchain", LOCK["toolchain"]["rust"]], capture_output=True, text=True).stdout
+            tl = subprocess.run([rustup, "target", "list", "--installed", "--toolchain", LOCK["toolchain"]["rust"]], capture_output=True, text=True, encoding="utf-8", errors="replace").stdout
             report("wasm32", "wasm32-unknown-unknown" in tl, "installed" if "wasm32-unknown-unknown" in tl else f"`rustup target add wasm32-unknown-unknown --toolchain {LOCK['toolchain']['rust']}`")
+        if IS_WIN:
+            # Build scripts and proc-macros compile for the host, which on *-msvc needs link.exe.
+            has_link = bool(shutil.which("link.exe")) or bool(_vs_installs())
+            report("msvc", has_link, "C++ build tools found" if has_link else
+                   "link.exe not found: install 'Build Tools for Visual Studio' with the C++ workload, "
+                   "or build on Linux/WSL and set KIT_WASM=path/to/module.wasm")
     else:
         report("rust", False, "cargo not found -> https://rustup.rs")
     node = which("node")
     if node:
-        v = subprocess.run([node, "--version"], capture_output=True, text=True).stdout.strip()
+        v = subprocess.run([node, "--version"], capture_output=True, text=True, encoding="utf-8", errors="replace").stdout.strip()
         major = int(re.sub(r"\D", "", v.split(".")[0]) or 0)
         report("node", major >= 22, v)
     else:
         report("node", False, "not found (needed for smoke/loadtest/web admin)")
     g = godot()
     if g:
-        v = subprocess.run([g, "--version", "--headless"], capture_output=True, text=True).stdout.strip().splitlines()
+        v = subprocess.run([g, "--version", "--headless"], capture_output=True, text=True, encoding="utf-8", errors="replace").stdout.strip().splitlines()
         ver = v[-1] if v else "?"
         report("godot", ver.startswith(LOCK["toolchain"]["godot"]), ver + " (optional)")
     else:
@@ -132,6 +152,15 @@ def cmd_doctor(args) -> int:
     report("python", sys.version_info >= (3, 11), sys.version.split()[0])
     print("doctor:", "all good" if problems == 0 else f"{problems} problem(s)")
     return 0 if problems == 0 else 1
+
+
+def _vs_installs() -> list[str]:
+    vswhere = Path(os.environ.get("ProgramFiles(x86)", r"C:\Program Files (x86)")) / "Microsoft Visual Studio" / "Installer" / "vswhere.exe"
+    if not vswhere.exists():
+        return []
+    out = subprocess.run([str(vswhere), "-products", "*", "-requires", "Microsoft.VisualStudio.Component.VC.Tools.x86.x64",
+                          "-property", "installationPath"], capture_output=True, text=True, encoding="utf-8", errors="replace").stdout
+    return [l for l in out.splitlines() if l.strip()]
 
 
 def cmd_server(args) -> int:
@@ -150,7 +179,7 @@ def cmd_server(args) -> int:
 
 def cmd_publish(args) -> int:
     module = ROOT / dev(args, "module") if not Path(dev(args, "module")).is_absolute() else Path(dev(args, "module"))
-    cmd = [*spacetime(), "publish", dev(args, "db"), "--server", dev(args, "url"), "--module-path", str(module), "--yes"]
+    cmd = [*spacetime(), "publish", dev(args, "db"), "--server", dev(args, "url"), *module_source(module), "--yes"]
     if args.wipe:
         cmd.append("--delete-data")
     return run(cmd, check=False).returncode
@@ -161,14 +190,21 @@ def fetch_schema(url: str, db: str) -> str:
         return r.read().decode("utf-8")
 
 
+def _order_insensitive(text: str) -> list[str]:
+    """Lines sorted, and the items of any [..] list literal sorted, so pure reordering compares equal."""
+    def sort_list(m: re.Match) -> str:
+        return "[" + ", ".join(sorted(x.strip() for x in m.group(1).split(","))) + "]"
+    return sorted(re.sub(r"\[([^\[\]]*)\]", sort_list, line) for line in text.splitlines())
+
+
 def cmd_bindings(args) -> int:
     module = ROOT / dev(args, "module")
     rc = 0
     # TypeScript (bots + web admin) straight from the module source.
-    for out in [BOTS / "src" / "module_bindings", ROOT / "templates" / "web-admin" / "src" / "module_bindings"]:
-        if out.parent.exists():
+    for out in [BOTS / "src" / "module_bindings", WEB_ADMIN / "src" / "module_bindings"]:
+        if (out.parent.parent / "package.json").exists():
             rc |= run([*spacetime(), "generate", "--lang", "typescript", "--out-dir", str(out),
-                       "--module-path", str(module), "--yes"], check=False).returncode
+                       *module_source(module), "--yes"], check=False).returncode
     # Godot (flametime SDK) from the published schema; needs a running server with the module.
     g = godot()
     if not g:
@@ -187,9 +223,26 @@ def cmd_bindings(args) -> int:
     run([g, "--headless", "--path", str(GODOT_TEMPLATE), "--import"], check=False, capture=True)
     if args.check:
         st = run(["git", "status", "--porcelain", "--", str(GODOT_TEMPLATE / "spacetime_bindings")], cwd=ROOT, capture=True, check=False)
-        if st.stdout.strip():
-            say("bindings drift: regenerated Godot bindings differ from the committed ones:\n" + st.stdout)
+        drift = []
+        names = run(["git", "diff", "--name-only", "--", str(GODOT_TEMPLATE / "spacetime_bindings")], cwd=ROOT, capture=True, check=False).stdout
+        names += run(["git", "ls-files", "--others", "--exclude-standard", "--full-name", "--", str(GODOT_TEMPLATE / "spacetime_bindings")],
+                     cwd=ROOT, capture=True, check=False).stdout
+        for line in names.splitlines():
+            rel = line.strip()
+            if not rel:
+                continue
+            # The GDScript codegen does not emit tables in a stable order across servers;
+            # a file whose lines are only reordered is not drift.
+            old_txt = run(["git", "show", f"HEAD:{rel}"], cwd=ROOT, capture=True, check=False).stdout or ""
+            new_path = ROOT / rel
+            new_txt = new_path.read_text(encoding="utf-8", errors="replace") if new_path.is_file() else ""
+            if _order_insensitive(old_txt) != _order_insensitive(new_txt):
+                drift.append(line)
+        if drift:
+            say("bindings drift: regenerated Godot bindings differ from the committed ones:\n" + "\n".join(drift))
             return 1
+        if st.stdout.strip():
+            say("Godot bindings differ only in line order (codegen ordering); no drift")
     return rc
 
 
@@ -198,7 +251,7 @@ def ensure_bots() -> None:
         run([npm(), "install", "--no-audit", "--no-fund"], cwd=BOTS)
     if not (BOTS / "src" / "module_bindings" / "index.ts").exists():
         run([*spacetime(), "generate", "--lang", "typescript", "--out-dir", str(BOTS / "src" / "module_bindings"),
-             "--module-path", str(ROOT / LOCK["dev"]["module"]), "--yes"])
+             *module_source(ROOT / LOCK["dev"]["module"]), "--yes"])
 
 
 def bots(args_list: list[str], capture: bool = True) -> subprocess.CompletedProcess:
@@ -222,7 +275,7 @@ def cmd_smoke(args) -> int:
     url, db = dev(args, "url"), dev(args, "db")
     res = bots(["--mode", "smoke", "--uri", ws_url(url), "--db", db])
     verdict = last_json(res.stdout or "")
-    print(json.dumps(verdict, indent=2) if verdict else (res.stdout + res.stderr))
+    print(json.dumps(verdict, indent=2) if verdict else ((res.stdout or "") + (res.stderr or "")))
     ok = bool(verdict) and verdict.get("verdict") == "PASS"
     if args.godot:
         ok = godot_smoke(url, db) and ok
@@ -237,20 +290,28 @@ def godot_smoke(url: str, db: str) -> bool:
         return False
     if not (GODOT_TEMPLATE / ".godot").exists():
         run([g, "--headless", "--path", str(GODOT_TEMPLATE), "--import"], check=False, capture=True)
-    base = [g, "--headless", "--path", str(GODOT_TEMPLATE), "--", "--autopilot", "--url", url, "--db", db, "--seconds", "4"]
+    base = [g, "--headless", "--path", str(GODOT_TEMPLATE), "--", "--autopilot", "--url", url, "--db", db, "--seconds", "8"]
     say("starting two headless Godot clients")
-    a = subprocess.Popen(base + ["--dir", "1,0"], stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True)
-    b = subprocess.Popen(base + ["--dir", "0,1"], stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True)
+    # Log to files, not pipes: the SDK is chatty and a full pipe (4 KB on Windows) would stall
+    # the second client until the first one exits, so they would never be online together.
+    logdir = Path(tempfile.mkdtemp(prefix="kit-godot-"))
+    procs = []
+    for name, d in (("A", "1,0"), ("B", "0,1")):
+        log = open(logdir / f"{name}.log", "w", encoding="utf-8")
+        procs.append((name, subprocess.Popen(base + ["--dir", d], stdout=log, stderr=subprocess.STDOUT), log))
     ok = True
-    for name, p in (("A", a), ("B", b)):
+    for name, p, log in procs:
         try:
-            out, _ = p.communicate(timeout=90)
+            p.wait(timeout=90)
         except subprocess.TimeoutExpired:
             p.kill()
-            out, ok = "timeout", False
+            ok = False
+        log.close()
+        out = (logdir / f"{name}.log").read_text(encoding="utf-8", errors="replace")
         line = next((l for l in out.splitlines() if l.startswith("AUTOPILOT")), "AUTOPILOT FAIL (no verdict)\n" + out[-2000:])
         print(f"  godot {name}: {line}")
         ok = ok and p.returncode == 0 and "PASS" in line
+    shutil.rmtree(logdir, ignore_errors=True)
     return ok
 
 
@@ -261,7 +322,7 @@ def cmd_loadtest(args) -> int:
                 "--bots", str(args.bots), "--duration", str(args.duration)])
     report = last_json(res.stdout or "")
     if not report:
-        print(res.stdout, res.stderr)
+        print(res.stdout or "", res.stderr or "")
         print("LOADTEST FAIL (no report)")
         return 1
     secs = max(1, report.get("duration_seconds", args.duration))
@@ -295,6 +356,29 @@ def cmd_loadtest(args) -> int:
     return 0 if verdict != "FAIL" else 1
 
 
+def _scannable(text: str, suffix: str) -> str:
+    """Blank out text the hallucination rules must not judge, keeping line numbers.
+
+    Markdown: only fenced code blocks are scanned (prose and tables may name wrong APIs on purpose).
+    Any file: lines between `kit:allow-begin` and `kit:allow-end` markers are skipped.
+    """
+    out, in_fence, allow = [], False, False
+    for line in text.split("\n"):
+        if "kit:allow-begin" in line:
+            allow = True
+        keep = not allow
+        if suffix == ".md":
+            if line.lstrip().startswith(("```", "~~~")):
+                in_fence = not in_fence
+                keep = False
+            elif not in_fence:
+                keep = False
+        if "kit:allow-end" in line:
+            allow = False
+        out.append(line if keep else "")
+    return "\n".join(out)
+
+
 def cmd_check(args) -> int:
     catalog = json.loads((ROOT / "rules" / "hallucinations.json").read_text(encoding="utf-8"))
     paths = [Path(p) for p in (args.paths or ["."])]
@@ -310,6 +394,7 @@ def cmd_check(args) -> int:
                 text = f.read_text(encoding="utf-8", errors="ignore")
             except OSError:
                 continue
+            text = _scannable(text, f.suffix)
             for rule in catalog["rules"]:
                 if rule.get("ext") and f.suffix not in rule["ext"]:
                     continue
@@ -335,14 +420,18 @@ def cmd_new(args) -> int:
     shutil.copytree(server_src, dest / "server", ignore=ignore)
     if args.client != "none":
         shutil.copytree(ROOT / "templates" / "client" / args.client, dest / "client", ignore=ignore)
-    for d in ("rules", "skills", "agents"):
-        shutil.copytree(ROOT / d, dest / ".kit" / d, ignore=ignore)
-    for f in ("AGENTS.md", "CLAUDE.md", "stdb.lock"):
-        shutil.copy2(ROOT / f, dest / f if f != "stdb.lock" else dest / f)
+    for d in ("rules", "skills", "agents", "docs"):
+        if (ROOT / d).exists():
+            shutil.copytree(ROOT / d, dest / d, ignore=ignore)
+    for f in ("AGENTS.md", "CLAUDE.md", "stdb.lock", ".gitignore", "NOTICE"):
+        if (ROOT / f).exists():
+            shutil.copy2(ROOT / f, dest / f)
     shutil.copytree(ROOT / "tools", dest / "tools", ignore=ignore)
     db = re.sub(r"[^a-z0-9-]", "-", args.name.lower())
     lock = (dest / "stdb.lock").read_text(encoding="utf-8")
     lock = lock.replace('database = "mmo-dev"', f'database = "{db}-dev"').replace('module = "templates/server/rust-single"', 'module = "server"')
+    lock = lock.replace("[dev]\n", "[dev]\n" + ('godot_client = "client"\n' if args.client == "godot" else "")
+                        + ('web_admin = "client"\n' if args.client == "web-admin" else ""), 1)
     (dest / "stdb.lock").write_text(lock, encoding="utf-8")
     cfg = dest / "client" / "spacetime_bindings" / "plugin_config.tres"
     if cfg.exists():
@@ -381,6 +470,16 @@ def cmd_vendor_skills(args) -> int:
             print(f"  UPDATED {name}")
         else:
             print(f"  same    {name}")
+    lic = "https://raw.githubusercontent.com/clockworklabs/SpacetimeDB/{ref}/codex-plugin/plugins/spacetimedb/LICENSE"
+    try:
+        with urllib.request.urlopen(lic.format(ref=args.ref), timeout=30) as r:
+            (out / "LICENSE").write_text(r.read().decode("utf-8"), encoding="utf-8")
+    except Exception as e:  # noqa: BLE001
+        print(f"  could not refresh LICENSE ({e}); keep the existing Apache-2.0 LICENSE file")
+    (out / "SOURCE.txt").write_text(
+        "upstream: https://github.com/clockworklabs/SpacetimeDB/tree/{0}/codex-plugin/plugins/spacetimedb/skills\n"
+        "ref: {0}\nfetched: {1}\nlicense: Apache-2.0 (see LICENSE); unmodified copies\n".format(
+            args.ref, time.strftime("%Y-%m-%d")), encoding="utf-8")
     print(f"vendor-skills: {changed} changed. Review the diff, re-run `python tools/kit.py check`, then commit.")
     return 0
 
@@ -401,6 +500,12 @@ def cmd_install_claude(args) -> int:
         if d.is_dir() and (d / "SKILL.md").exists():
             shutil.copytree(d, skills_out / d.name, dirs_exist_ok=True)
             m += 1
+    official = ROOT / "skills" / "vendor" / "official"
+    if official.exists():  # official skills keep their upstream names (cli, rust-server, unity, ...)
+        for d in sorted(official.iterdir()):
+            if d.is_dir() and (d / "SKILL.md").exists():
+                shutil.copytree(d, skills_out / d.name, dirs_exist_ok=True)
+                m += 1
     say(f"installed {n} agents and {m} skills under {dest / '.claude'} (regenerated copies; edit the originals)")
     return 0
 

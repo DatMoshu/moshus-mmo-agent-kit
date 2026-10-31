@@ -29,6 +29,30 @@ Lessons recorded from these runs, now in skills and docs:
 * Offline players kept their transform rows, and clients rendered them as ghosts. The template
   now deletes the transform on disconnect and restores it on join.
 
-## Windows x86_64
+## 2026-10-30: Windows 11 x86_64 (workstation)
 
-See the entries below. They were added when the kit was installed on a Windows workstation.
+The environment was the SpacetimeDB 2.14.0 Windows release (CLI and standalone server running in an
+isolated `--root-dir`), rustup 1.97.1 msvc with wasm32 installed, Node 22.15, Python 3.12, and Godot 4.6.3
+(console build). This machine had **no Visual Studio C++ Build Tools**.
+
+| Check | Command | Result |
+|---|---|---|
+| Toolchain doctor | `python tools/kit.py doctor` | spacetime, rust, wasm32, node, godot, python OK; **msvc FAIL** (no `link.exe`) |
+| rust-single builds on Windows | `cargo build --target wasm32-unknown-unknown --release` | **UNVERIFIED**: build scripts need the MSVC linker. Install "Build Tools for Visual Studio" (C++ workload), or build on Linux/WSL |
+| Publish a prebuilt module | `KIT_WASM=mmo_server.wasm python tools/kit.py publish` (`--bin-path`) | OK (wasm built on Linux) |
+| TS bindings from the wasm | `spacetime generate --bin-path` | OK |
+| Two-player smoke (TS SDK) | `python tools/kit.py smoke` | **PASS** (reducer p95 about 2.5 ms) |
+| Two-player smoke (Godot 4.6.3) | `python tools/kit.py smoke --godot` | **PASS** on 2 of 2 runs after the fixes below |
+| Godot bindings drift check | `python tools/kit.py bindings --check` | PASS (only line order differed) |
+| Load gate, 50 bots x 20 s | `python tools/kit.py loadtest --bots 50 --duration 20` | **PASS**: p99 about 17 ms, avg tick lateness about 2.7 ms, level 0, about 850 row updates per bot per second |
+
+Fixes made because of the Windows run:
+
+* `kit.py` decodes child output as UTF-8. The Windows default code page crashed on CLI output.
+* `kit.py` finds `cargo` in `~/.cargo/bin` when it is not on PATH. `doctor` checks for the MSVC linker.
+* `KIT_WASM` lets `publish` and `bindings` use a prebuilt `.wasm` (`--bin-path`).
+* The Godot smoke writes to log files instead of pipes. A full 4 KB Windows pipe stalled the second
+  client until the first one exited, so the two clients were never online at the same time.
+* The Godot autopilot paces back and forth. Clients stay near spawn and in each other's area of interest
+  even when they start a few seconds apart.
+* The GDScript codegen emits tables in an order that varies by server, so `bindings --check` ignores pure reordering.

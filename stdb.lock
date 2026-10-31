@@ -37,4 +37,4 @@ module = "templates/server/rust-single"
 # What was actually exercised, where, and how (see docs/VERIFICATION.md for the full log).
 [tested]
 "linux-x86_64" = "spacetimedb 2.14.0 standalone + CLI, rust 1.97.1 wasm32, node 24, godot 4.6.3 headless; 2026-10-30"
-"windows-x86_64" = "see docs/VERIFICATION.md"
+"windows-x86_64" = "runtime verified (spacetimedb 2.14.0, node 22, godot 4.6.3; prebuilt wasm via KIT_WASM). Rust build unverified without MSVC Build Tools; see docs/VERIFICATION.md; 2026-10-30"

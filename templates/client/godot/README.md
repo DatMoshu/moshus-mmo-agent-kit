@@ -37,7 +37,7 @@ Open the folder in Godot 4.6.3 and press Play twice (Debug > Customize Run Insta
 Headless:
 
 ```bash
-godot --headless --path . -- --autopilot --url http://127.0.0.1:3000 --db mmo-dev --dir 1,0 --seconds 4
+godot --headless --path . -- --autopilot --url http://127.0.0.1:3000 --db mmo-dev --dir 1,0 --seconds 8
 ```
 
 The other options are `--name`, `--profile`, and `--expect-peers N`.
