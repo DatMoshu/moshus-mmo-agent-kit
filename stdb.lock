@@ -5,7 +5,7 @@
 [spacetimedb]
 version = "2.14.0"            # CLI + standalone server + module crate + client SDKs move together
 rust_crate = "=2.14.0"        # templates/server/*/Cargo.toml
-npm_sdk = "2.14.0"            # tools/loadtest/bots, templates/web-admin
+npm_sdk = "2.14.0"            # tools/loadtest/bots, templates/client/web-admin
 release_url = "https://github.com/clockworklabs/SpacetimeDB/releases/tag/v2.14.0"
 license = "BSL-1.1 (server); Apache-2.0 (SDKs, bindings crates, templates, codex-plugin skills)"
 

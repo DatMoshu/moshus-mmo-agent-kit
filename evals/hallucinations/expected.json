@@ -1,0 +1,10 @@
+{
+  "samples/server/bad_lib.rs": ["rs-legacy-attr", "rs-table-name-only", "rs-derive-spacetimetype-table", "rs-schedule-attr",
+                                "rs-ctx-sender-field", "rs-ctx-identity", "rs-wall-clock", "rs-thread-rng",
+                                "rs-generated-filter-by", "rs-std-io"],
+  "samples/server/Cargo.toml": ["rs-unpinned-crate", "rs-sdk-crate-in-module"],
+  "samples/server/bad_module.ts": ["ts-legacy-sdk-package", "ts-module-nondeterminism", "ts-identity-from-string"],
+  "samples/client/Bad.cs": ["cs-table-name-only", "cs-reducerkind-legacy"],
+  "samples/client/notes.md": ["cli-project-path"],
+  "samples/client/good.md": []
+}

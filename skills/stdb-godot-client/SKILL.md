@@ -12,7 +12,7 @@ The reference is `templates/client/godot`, which is verified headless (`python t
 - **One facade:** `net/net_session.gd` (autoload `Net`) is the only file that touches the SDK. Gameplay calls
   `Net.connect_to_server`, `Net.join`, `Net.send_move`, `Net.my_transform()` and `Net.visible_transforms()`. Upgrading
   or replacing the SDK changes one file.
-- **Bindings:** generated into `spacetime_bindings/` by `tools/codegen.gd` from the server's schema. They are committed
+- **Bindings:** generated into `spacetime_bindings/` by `templates/client/godot/tools/codegen.gd` from the server's schema. They are committed
   so the project opens without a server.
 - **Scenes** render from the client cache. They never invent authoritative state. Input becomes intent reducers
   (`set_input(dir_x, dir_y, seq)`).

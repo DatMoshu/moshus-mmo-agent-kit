@@ -1,0 +1,8 @@
+[package]
+name = "bad_module"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+spacetimedb = "2.14"
+spacetimedb-sdk = "2.14.0"

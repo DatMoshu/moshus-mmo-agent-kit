@@ -356,6 +356,13 @@ def cmd_loadtest(args) -> int:
     return 0 if verdict != "FAIL" else 1
 
 
+def _relposix(f: Path) -> str:
+    try:
+        return f.resolve().relative_to(ROOT).as_posix()
+    except ValueError:
+        return f.as_posix()
+
+
 def _scannable(text: str, suffix: str) -> str:
     """Blank out text the hallucination rules must not judge, keeping line numbers.
 
@@ -382,13 +389,13 @@ def _scannable(text: str, suffix: str) -> str:
 def cmd_check(args) -> int:
     catalog = json.loads((ROOT / "rules" / "hallucinations.json").read_text(encoding="utf-8"))
     paths = [Path(p) for p in (args.paths or ["."])]
-    exts = {".rs", ".ts", ".tsx", ".cs", ".gd", ".cpp", ".h", ".md", ".toml", ".json"}
-    skip = {"node_modules", "target", ".git", ".godot", "module_bindings", "spacetime_bindings", "vendor", "addons", ".kit"}
+    exts = {".rs", ".ts", ".tsx", ".js", ".cs", ".gd", ".cpp", ".h", ".md", ".toml", ".json", ".py", ".sh", ".ps1", ".yml", ".yaml"}
+    skip = {"node_modules", "target", ".git", ".godot", "module_bindings", "spacetime_bindings", "vendor", "addons", ".kit", "samples"}
     hits = 0
     for base in paths:
         files = [base] if base.is_file() else [p for p in base.rglob("*") if p.is_file() and p.suffix in exts and not (set(p.parts) & skip)]
         for f in files:
-            if f.name == "hallucinations.json":
+            if f.name in ("hallucinations.json", "kit.py"):
                 continue
             try:
                 text = f.read_text(encoding="utf-8", errors="ignore")
@@ -398,7 +405,9 @@ def cmd_check(args) -> int:
             for rule in catalog["rules"]:
                 if rule.get("ext") and f.suffix not in rule["ext"]:
                     continue
-                for m in re.finditer(rule["pattern"], text):
+                if rule.get("path") and not re.search(rule["path"], _relposix(f)):
+                    continue
+                for m in re.finditer(rule["pattern"], text, re.M):
                     line = text.count("\n", 0, m.start()) + 1
                     ctx_line = text.splitlines()[line - 1] if text else ""
                     if "kit:allow" in ctx_line:
