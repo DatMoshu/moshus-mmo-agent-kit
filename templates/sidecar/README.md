@@ -1,8 +1,8 @@
 # sidecar: a helper process with its own identity
 
-**Status: VERIFIED (watch + /health + guard denial)** on Linux against `rust-single`-compatible
-modules (2.14.0, Node 24). The guard's *success* path (closing admission as an authorised
-operator) is not exercised, because the starter modules only accept the publisher as admin.
+**Status: VERIFIED (watch + /health + guard denial + guard success)** on Linux against `rust-single`-compatible
+modules (2.14.0, Node 24). The success path (closing admission as an authorised operator) was verified with the
+operator role from `recipes/operator-role.md`. The starter modules alone accept only the publisher as admin.
 
 Some work does not belong inside a reducer: anything that talks to the outside world (HTTP, email,
 payments, LLMs), long waits, or supervision. Run it in a **sidecar**, a normal SpacetimeDB
@@ -43,13 +43,14 @@ into chat, logs or an AI prompt.
 
 ## Giving the sidecar a role
 
-The starter modules have one admin, the identity that published the database. To let a sidecar act:
+The starter modules have one admin, the identity that published the database. To let a sidecar act
+(the drop-in code is `recipes/snippets/operator.rs`):
 
 1. Add an `operator` table (`identity` primary key, `role` string) and a `require_operator(ctx)` helper
    that accepts the admin **or** a row in `operator`.
 2. Add an admin-only `grant_operator(identity, role)` reducer.
 3. Start the sidecar once with `--token-file`, copy the identity it prints, and call
-   `spacetime call <db> grant_operator -- '"0x<identity>"' '"ops"'`.
+   `spacetime call <db> grant_operator 0x<identity> '"ops"'`.
 4. Use `require_operator` in the reducers the sidecar may call (`set_admission_open` here).
 
 Never let the sidecar use the publisher's CLI token. Separate identities keep the audit trail clear

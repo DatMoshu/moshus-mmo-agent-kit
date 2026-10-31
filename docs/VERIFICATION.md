@@ -80,7 +80,7 @@ Lessons recorded from these runs:
 * Inside a folder with a multi-database `spacetime.json`, `spacetime call` needs `--no-config` (or a
   database from the config).
 
-Not verified: a real client following `my_departure` to reconnect (recipe only), rust-sharded on Windows
+Not verified: rust-sharded on Windows. (A client following `my_departure` across regions was verified later; see the region-hop entry below.)
 (same MSVC limit as rust-single), and load across regions.
 
 ## 2026-10-31: Linux x86_64 (kit authoring box), `templates/server/ts-single`
@@ -104,7 +104,7 @@ wire-compatible.
 | One-shot status | `npx tsx src/main.ts --db <db> --once` | **SIDECAR PASS** (read tick_health, world_config, player) |
 | Health endpoint | `--http-port 18777`, `curl /health` | 200 with JSON status |
 | Guard denial | `--guard --red-level 0 --red-ticks 1` with a non-admin identity | `set_admission_open` rejected with `admin only`, recorded in `last_error`; process keeps running |
-| Guard success path | sidecar holding an operator role | **not verified** (starter modules have no operator role; README shows how to add one) |
+| Guard success path | sidecar holding an operator role | **PASS** with `recipes/snippets/operator.rs` (see the recipe snippets entry below) |
 
 Lesson: `table.count()` returns a `bigint` in the TS SDK. Convert with `Number()` before `JSON.stringify`.
 
