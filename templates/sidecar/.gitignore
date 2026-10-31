@@ -1,0 +1,4 @@
+node_modules/
+dist/
+# the sidecar's own identity token when --token-file points here; never commit it
+.sidecar/

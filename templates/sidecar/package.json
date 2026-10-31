@@ -1,0 +1,20 @@
+{
+  "name": "mmo-ops-sidecar",
+  "private": true,
+  "version": "0.1.0",
+  "license": "Apache-2.0",
+  "type": "module",
+  "description": "Helper process for a SpacetimeDB world: watches tick_health, serves a local /health endpoint, and (optionally) closes admission when the tick goes red.",
+  "scripts": {
+    "start": "tsx src/main.ts",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "spacetimedb": "2.14.0"
+  },
+  "devDependencies": {
+    "tsx": "4.20.6",
+    "typescript": "5.9.3",
+    "@types/node": "22.18.0"
+  }
+}

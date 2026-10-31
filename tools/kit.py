@@ -44,6 +44,7 @@ LOCK = tomllib.loads((ROOT / "stdb.lock").read_text(encoding="utf-8"))
 BOTS = ROOT / "tools" / "loadtest" / "bots"
 GODOT_TEMPLATE = ROOT / LOCK["dev"].get("godot_client", "templates/client/godot")
 WEB_ADMIN = ROOT / LOCK["dev"].get("web_admin", "templates/client/web-admin")
+SIDECAR = ROOT / LOCK["dev"].get("sidecar", "templates/sidecar")
 IS_WIN = os.name == "nt"
 
 
@@ -200,8 +201,8 @@ def _order_insensitive(text: str) -> list[str]:
 def cmd_bindings(args) -> int:
     module = ROOT / dev(args, "module")
     rc = 0
-    # TypeScript (bots + web admin) straight from the module source.
-    for out in [BOTS / "src" / "module_bindings", WEB_ADMIN / "src" / "module_bindings"]:
+    # TypeScript (bots, web admin, sidecar) straight from the module source.
+    for out in [BOTS / "src" / "module_bindings", WEB_ADMIN / "src" / "module_bindings", SIDECAR / "src" / "module_bindings"]:
         if (out.parent.parent / "package.json").exists():
             rc |= run([*spacetime(), "generate", "--lang", "typescript", "--out-dir", str(out),
                        *module_source(module), "--yes"], check=False).returncode
