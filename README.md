@@ -26,9 +26,11 @@ minutes, then grow the same design toward thousands of players.
 | `templates/client/web-admin` | Vite + TypeScript live map and admin console (built and verified in headless Chrome) |
 | `templates/client/unity` | Thin Unity starter. The session logic is verified headlessly with .NET; the editor was not run |
 | `templates/client/unreal` | Thin Unreal C++ starter, with bindings generated and the API checked by hand. **Not compiled** |
-| `tools/kit.py` | One CLI: `doctor`, `server`, `publish`, `bindings`, `smoke`, `loadtest`, `check`, `new`, `vendor-skills`, `kb-export` |
+| `tools/kit.py` | One CLI: `doctor`, `server`, `publish`, `bindings`, `smoke`, `loadtest`, `check`, `new`, `vendor-skills`, `install-claude`, `kb-export` |
 | `tools/loadtest/bots` | A TypeScript bot swarm (SDK 2.14): smoke test, AOI-aware swarm, latency percentiles, tick health |
-| `evals/`, `recipes/`, `kb/` | Agent evals, task recipes, and the public knowledge base (JSON plus SQLite) |
+| `recipes/` | Copyable features with compiled, run-checked Rust snippets: AOI, inventory/trades, chat, idempotent requests, operator role, region hand-off client, invite-only playtest |
+| `evals/` | `run_evals.py` (hallucination-rule self-test, frontmatter, links) plus 10 graded agent-behaviour scenarios |
+| `kb/` | A public knowledge base of facts, gotchas, patterns, processes, decisions, versions and sources, each with confidence and evidence. Stored as JSON; `kit.py kb-export` builds a SQLite copy |
 
 ## 30-minute quickstart: two players moving
 

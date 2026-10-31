@@ -369,7 +369,7 @@
   "subject": "scale",
   "statement": "Small-scale reference point: Classic open-source multiplayer mods typically see tens of concurrent real players; a Godot+STDB hobby MMO should first prove 50-100 bots before chasing 1,000+.",
   "confidence": "ESTIMATE",
-  "evidence": "TES3MP community numbers; local staged scale plan",
+  "evidence": "Public community server listings for open-source multiplayer mods (estimate)",
   "tags": [
    "scale",
    "planning"
