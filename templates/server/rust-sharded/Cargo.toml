@@ -1,0 +1,13 @@
+[workspace]
+members = ["global", "region"]
+resolver = "2"
+
+[workspace.dependencies]
+# Pinned to match stdb.lock. Bump the CLI, the server, this crate and every client SDK together.
+spacetimedb = "=2.14.0"
+log = "0.4"
+
+[profile.release]
+opt-level = "s"
+lto = true
+codegen-units = 1

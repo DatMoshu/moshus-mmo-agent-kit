@@ -1,0 +1,19 @@
+{
+  // Sharded world: one global database plus region databases that all run the same `region` module.
+  // Publish order matters only for configuration (see README): global first, then regions.
+  "database": "mmo-global",
+  "module-path": "./global",
+  "children": [
+    {
+      "database": "mmo-region-1",
+      "module-path": "./region",
+      // Receiver bindings used by the region module: calls to the global database, and calls to
+      // peer regions (the same module). Generated into region/src/remote_bindings/.
+      "dependencies": [
+        { "name": "global", "module-path": "./global" },
+        { "name": "region", "module-path": "./region" }
+      ]
+    },
+    { "database": "mmo-region-2", "module-path": "./region" }
+  ]
+}

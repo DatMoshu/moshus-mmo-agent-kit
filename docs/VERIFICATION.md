@@ -56,3 +56,29 @@ Fixes made because of the Windows run:
 * The Godot autopilot paces back and forth. Clients stay near spawn and in each other's area of interest
   even when they start a few seconds apart.
 * The GDScript codegen emits tables in an order that varies by server, so `bindings --check` ignores pure reordering.
+
+## 2026-10-31: Linux x86_64 (kit authoring box), `templates/server/rust-sharded`
+
+The environment was the same as the 2026-10-30 Linux entry (SpacetimeDB 2.14.0 standalone, Rust 1.97.1).
+
+| Check | Command | Result |
+|---|---|---|
+| Workspace builds (global + region) | `cargo build --target wasm32-unknown-unknown --release` | OK, 0 warnings |
+| IDC bindings from `spacetime.json` | `spacetime generate mmo-region-1 -y` (two passes, see README) | OK: `region/src/remote_bindings/{global,region}` |
+| Publish + wire 2 regions by hand | README runbook | OK |
+| Publish + wire 3 regions, then `--wipe` | `python scripts/dev_up.py --regions 3` | OK; neighbours peered, global registry correct |
+| Handoff region 1 -> 2 | `gm_teleport` over the border | **PASS**: player deleted in 1, `departure.to_region = 2`, Active in 2 at the target position, global `player_home.region_id = 2`, all outboxes empty |
+| Handoff region 2 -> 1 | same, reverse | **PASS** |
+| Spoofed IDC calls from a client | `spacetime call ... accept_handoff`, `... player_entered` | **PASS**: rejected (`caller is not a peer region`, `caller is not a registered region`) |
+| Heartbeats | `SELECT * FROM region` in global | OK, `last_heartbeat` advances every 5 s |
+
+Lessons recorded from these runs:
+
+* `spacetime call` disconnects after every call, and the template clears input on disconnect, so CLI
+  movement tests stall. The admin `gm_teleport` reducer exists for operators and smoke tests.
+* Pass `--` before reducer arguments, or negative numbers are read as flags.
+* Inside a folder with a multi-database `spacetime.json`, `spacetime call` needs `--no-config` (or a
+  database from the config).
+
+Not verified: a real client following `my_departure` to reconnect (recipe only), rust-sharded on Windows
+(same MSVC limit as rust-single), and load across regions.
