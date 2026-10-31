@@ -1,0 +1,12 @@
+{
+  "FileVersion": 3,
+  "EngineAssociation": "5.6",
+  "Category": "",
+  "Description": "Thin SpacetimeDB client starter from Moshu's MMO Agent Kit",
+  "Modules": [
+    { "Name": "MmoKitClient", "Type": "Runtime", "LoadingPhase": "Default" }
+  ],
+  "Plugins": [
+    { "Name": "SpacetimeDbSdk", "Enabled": true }
+  ]
+}

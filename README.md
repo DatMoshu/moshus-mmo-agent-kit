@@ -20,7 +20,12 @@ minutes, then grow the same design toward thousands of players.
 | `docs/` | Decision tree, scale ladder (10 to 5,000 players), processes, verification log, licensing guide (not legal advice) |
 | `templates/server/rust-single` | A running Rust world module: admission, players, 20 Hz movement tick, AOI cells, health and degradation levels |
 | `templates/client/godot` | A Godot 4.6 client on the MIT flametime SDK behind a small `Net` seam, with a headless autopilot test |
-| `templates/...` | More starters (TypeScript server, sharded Rust, sidecar, web admin, Unity, Unreal); each states whether it was verified |
+| `templates/server/ts-single` | The same world in TypeScript, wire-compatible with every client (verified) |
+| `templates/server/rust-sharded` | Global and region databases with 2.14 cross-database outbox handoff, plus `dev_up.py` (verified locally) |
+| `templates/sidecar` | A Node helper process: world census, health-guard pattern, and a place for NPC/outbox work (verified) |
+| `templates/client/web-admin` | Vite + TypeScript live map and admin console (built and verified in headless Chrome) |
+| `templates/client/unity` | Thin Unity starter. The session logic is verified headlessly with .NET; the editor was not run |
+| `templates/client/unreal` | Thin Unreal C++ starter, with bindings generated and the API checked by hand. **Not compiled** |
 | `tools/kit.py` | One CLI: `doctor`, `server`, `publish`, `bindings`, `smoke`, `loadtest`, `check`, `new`, `vendor-skills`, `kb-export` |
 | `tools/loadtest/bots` | A TypeScript bot swarm (SDK 2.14): smoke test, AOI-aware swarm, latency percentiles, tick health |
 | `evals/`, `recipes/`, `kb/` | Agent evals, task recipes, and the public knowledge base (JSON plus SQLite) |
@@ -89,6 +94,7 @@ python tools/kit.py loadtest --bots 100 --duration 20     # PASS / CONCERNS / FA
 
 ```bash
 python tools/kit.py new my-game --dest ..    # copies server + client + tools + rules into ../my-game
+python tools/kit.py new my-mmo --server ts-single --client web-admin --sidecar   # other combinations
 ```
 
 Then point your agent at it: *"Read AGENTS.md. Add a chat channel per region, following

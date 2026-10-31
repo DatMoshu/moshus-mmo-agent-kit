@@ -1,0 +1,9 @@
+Binaries/
+Intermediate/
+Saved/
+DerivedDataCache/
+.vs/
+*.sln
+# the SDK plugin is copied in by you (see README); not vendored here
+Plugins/SpacetimeDbSdk/
+.mmo_kit_token

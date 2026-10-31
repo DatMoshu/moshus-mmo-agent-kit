@@ -119,3 +119,25 @@ Lesson: `table.count()` returns a `bigint` in the TS SDK. Convert with `Number()
 
 Lesson: `chrome --dump-dom` never returns while a page holds an open WebSocket. Use the DevTools
 protocol (`--remote-debugging-port`, `Runtime.evaluate`) to read a live SpacetimeDB page headlessly.
+
+## 2026-10-31: Linux x86_64, `templates/client/unity` and `templates/client/unreal`
+
+| Check | Command | Result |
+|---|---|---|
+| Unity: C# bindings | `spacetime generate --lang csharp` from rust-single | OK |
+| Unity: session logic compiles | `ci/SessionCheck`: .NET 8 + `SpacetimeDB.ClientSDK` 2.14.0 compiling `MmoSession.cs` + bindings | OK, 0 warnings |
+| Unity: two-client smoke | `dotnet run -- <url> <db>` against the Rust **and** the TS starter modules | **SESSION PASS** on both |
+| Unity: editor / `MmoWorldView.cs` | Unity 2022.3+ | **not verified** (no Unity on the box) |
+| Unreal: bindings | `spacetime generate --lang unrealcpp --unreal-module-name MmoKitClient` | OK (generated headers + module files) |
+| Unreal: API cross-check | `MmoGameManager` symbols matched against generated headers and SDK headers at `v2.14.0` | OK (manual) |
+| Unreal: compile / play | UE 5.x | **not verified** (no Unreal Engine on the box) |
+
+Lesson: put a Unity client's SpacetimeDB logic in a class with no `UnityEngine` types. It can then be
+compiled and smoke-tested headlessly with plain .NET in CI, while the MonoBehaviour stays a thin view.
+
+## 2026-10-31: `kit.py new` end-to-end
+
+`kit.py new <name> --server {rust-single|ts-single|rust-sharded} --client {godot|web-admin|unity|unreal} --sidecar`
+produced complete trees for all four combinations tried. For `--server ts-single --client web-admin --sidecar`:
+`npm install`, then `kit.py publish` → `kit.py bindings` → `kit.py smoke` gave **SMOKE PASS**, and `npm run build` of the client passed.
+Fixed during this check: `bindings` no longer fails when the project has no Godot client.

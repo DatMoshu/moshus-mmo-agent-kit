@@ -207,6 +207,8 @@ def cmd_bindings(args) -> int:
             rc |= run([*spacetime(), "generate", "--lang", "typescript", "--out-dir", str(out),
                        *module_source(module), "--yes"], check=False).returncode
     # Godot (flametime SDK) from the published schema; needs a running server with the module.
+    if not (GODOT_TEMPLATE / "project.godot").exists():
+        return rc  # no Godot client in this project
     g = godot()
     if not g:
         say("GODOT not set: skipped Godot bindings (the template ships bindings for templates/server/rust-single)")
@@ -430,6 +432,8 @@ def cmd_new(args) -> int:
     shutil.copytree(server_src, dest / "server", ignore=ignore)
     if args.client != "none":
         shutil.copytree(ROOT / "templates" / "client" / args.client, dest / "client", ignore=ignore)
+    if getattr(args, "sidecar", False):
+        shutil.copytree(ROOT / "templates" / "sidecar", dest / "sidecar", ignore=ignore)
     for d in ("rules", "skills", "agents", "docs"):
         if (ROOT / d).exists():
             shutil.copytree(ROOT / d, dest / d, ignore=ignore)
@@ -449,8 +453,17 @@ def cmd_new(args) -> int:
     cargo = dest / "server" / "Cargo.toml"
     if cargo.exists():
         cargo.write_text(re.sub(r'^name = ".*"$', f'name = "{db.replace("-", "_")}_server"', cargo.read_text(encoding="utf-8"), count=1, flags=re.M), encoding="utf-8")
+    if getattr(args, "sidecar", False):
+        lock = (dest / "stdb.lock").read_text(encoding="utf-8").replace("[dev]\n", '[dev]\nsidecar = "sidecar"\n', 1)
+        (dest / "stdb.lock").write_text(lock, encoding="utf-8")
     say(f"created {dest}")
-    print(f"next:\n  cd {dest}\n  python tools/kit.py doctor\n  python tools/kit.py publish\n  python tools/kit.py smoke")
+    if args.server == "rust-sharded":
+        print(f"next:\n  cd {dest}\n  python tools/kit.py doctor\n  python server/scripts/dev_up.py --regions 2   # global + 2 regions, peered"
+              "\n  see server/README.md for the handoff protocol and client flow")
+    else:
+        print(f"next:\n  cd {dest}\n  python tools/kit.py doctor\n  python tools/kit.py publish\n  python tools/kit.py smoke")
+    if args.client in ("unity", "unreal"):
+        print(f"  client/README.md: {args.client} starter (read its Status line first)")
     return 0
 
 
@@ -562,7 +575,7 @@ def main() -> int:
     s = common(sub.add_parser("smoke")); s.add_argument("--godot", action="store_true")
     s = common(sub.add_parser("loadtest")); s.add_argument("--bots", type=int, default=100); s.add_argument("--duration", type=int, default=20)
     s = sub.add_parser("check"); s.add_argument("paths", nargs="*")
-    s = sub.add_parser("new"); s.add_argument("name"); s.add_argument("--dest", default=".."); s.add_argument("--server", default="rust-single"); s.add_argument("--client", default="godot", choices=["godot", "none"])
+    s = sub.add_parser("new"); s.add_argument("name"); s.add_argument("--dest", default=".."); s.add_argument("--server", default="rust-single"); s.add_argument("--client", default="godot", choices=["godot", "web-admin", "unity", "unreal", "none"]); s.add_argument("--sidecar", action="store_true", help="also copy templates/sidecar")
     s = sub.add_parser("vendor-skills"); s.add_argument("--ref", default="master")
     sub.add_parser("kb-export")
     s = sub.add_parser("install-claude"); s.add_argument("--dest", help="project root (default: this repo)")
