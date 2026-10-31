@@ -107,3 +107,15 @@ wire-compatible.
 | Guard success path | sidecar holding an operator role | **not verified** (starter modules have no operator role; README shows how to add one) |
 
 Lesson: `table.count()` returns a `bigint` in the TS SDK. Convert with `Number()` before `JSON.stringify`.
+
+## 2026-10-31: Linux x86_64, `templates/client/web-admin`
+
+| Check | Command | Result |
+|---|---|---|
+| Bindings | `python tools/kit.py bindings` | written to `src/module_bindings` |
+| Build | `npm run build` (tsc + Vite 8.3.5) | OK, 121 kB JS (32 kB gzip) |
+| Runtime | `vite preview` + headless Chrome (read through DevTools protocol) against a live TS-module database | Subscribed; cards showed level 0, tick count, lateness, admission open, role `viewer`; 56 player rows; admin controls hidden for a non-admin identity |
+| Admin actions from the browser | as the publisher identity | **not verified** (would need the publisher's token in the browser) |
+
+Lesson: `chrome --dump-dom` never returns while a page holds an open WebSocket. Use the DevTools
+protocol (`--remote-debugging-port`, `Runtime.evaluate`) to read a live SpacetimeDB page headlessly.
