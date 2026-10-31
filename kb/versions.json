@@ -1,0 +1,35 @@
+[
+ {
+  "component": "spacetimedb",
+  "version": "v2.14.0",
+  "released": "2026-10-30",
+  "highlights": "Async inter-database calls (Rust/TS) via spacetime.json deps, outbox tables, on_result callbacks; same-host only.",
+  "breaking": "is_internal() semantics; upgrade server before modules.",
+  "url": "https://github.com/clockworklabs/SpacetimeDB/releases/tag/v2.14.0",
+  "visibility": "public"
+ },
+ {
+  "component": "spacetimedb",
+  "version": "v2.13.0",
+  "released": "2026-10",
+  "highlights": "HTTP calls wait for durability (504 = unknown outcome); Rust MSRV 1.97.",
+  "breaking": "Retries must be idempotent.",
+  "visibility": "public"
+ },
+ {
+  "component": "spacetimedb",
+  "version": "v2.12.0",
+  "released": "2026-10",
+  "highlights": "Scheduler dedup, Rust module test utilities, C#/TS auto-reconnect.",
+  "breaking": "HS256 JWTs rejected.",
+  "visibility": "public"
+ },
+ {
+  "component": "godot-sdk (flametime)",
+  "version": "0.2.5",
+  "released": "2026",
+  "highlights": "GDScript SDK for STDB 2.3.0+, Godot 4.6.1+; PK required for cache; no Brotli.",
+  "breaking": "",
+  "visibility": "public"
+ }
+]

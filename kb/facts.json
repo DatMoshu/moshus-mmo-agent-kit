@@ -1,0 +1,614 @@
+[
+ {
+  "subject": "architecture",
+  "statement": "Each SpacetimeDB database is a single-threaded actor: reducers execute serially in-memory against tables, with durability via a commit log + snapshots. Throughput comes from no network hop between logic and data, not from parallelism.",
+  "confidence": "VENDOR CLAIM",
+  "evidence": "spacetimedb.com/blog/how-does-spacetime-scale (2026-09-03)",
+  "tags": [
+   "architecture",
+   "scale"
+  ],
+  "visibility": "public",
+  "origin": "curated",
+  "as_of": "2026-10-30"
+ },
+ {
+  "subject": "architecture",
+  "statement": "Reducers are transactional: any panic/Err rolls back every write in that call. Duplication bugs from half-applied trades are structurally prevented when the whole operation is one reducer.",
+  "confidence": "DOCUMENTED",
+  "evidence": "docs core-concepts/functions; bitcraftonline.com/news/spacetimedb-and-bitcraft",
+  "tags": [
+   "architecture",
+   "correctness"
+  ],
+  "visibility": "public",
+  "origin": "curated",
+  "as_of": "2026-10-30"
+ },
+ {
+  "subject": "architecture",
+  "statement": "Clients receive state through SQL subscriptions; the server pushes row inserts/deletes (updates = delete+insert by primary key) as each transaction commits, and the SDK maintains a client-side cache.",
+  "confidence": "DOCUMENTED",
+  "evidence": "docs core-concepts/subscriptions",
+  "tags": [
+   "subscriptions",
+   "client"
+  ],
+  "visibility": "public",
+  "origin": "curated",
+  "as_of": "2026-10-30"
+ },
+ {
+  "subject": "architecture",
+  "statement": "Modules can be written in Rust, C#, TypeScript (V8) or C++; clients exist for Rust, C#/Unity, TypeScript/React, Unreal (C++/Blueprint) plus community GDScript (Godot), Elixir and others.",
+  "confidence": "DOCUMENTED",
+  "evidence": "README.md; llms.txt; github topic spacetimedb",
+  "tags": [
+   "sdk"
+  ],
+  "visibility": "public",
+  "origin": "curated",
+  "as_of": "2026-10-30"
+ },
+ {
+  "subject": "architecture",
+  "statement": "Procedures (beta) are the only module functions allowed to do outbound HTTP; they are not transactional by default and must open explicit transactions to write tables.",
+  "confidence": "DOCUMENTED",
+  "evidence": "docs core-concepts/functions (procedures)",
+  "tags": [
+   "procedures",
+   "http"
+  ],
+  "visibility": "public",
+  "origin": "curated",
+  "as_of": "2026-10-30"
+ },
+ {
+  "subject": "architecture",
+  "statement": "Views are read-only module functions clients can subscribe to, useful for per-player projections and hiding information.",
+  "confidence": "DOCUMENTED",
+  "evidence": "docs core-concepts/functions; how-to games/hide-information",
+  "tags": [
+   "views",
+   "anti-cheat"
+  ],
+  "visibility": "public",
+  "origin": "curated",
+  "as_of": "2026-10-30"
+ },
+ {
+  "subject": "architecture",
+  "statement": "Row-level security / client-visibility filters let a module restrict which rows a given identity can see in subscriptions; combine with private tables for hidden information.",
+  "confidence": "DOCUMENTED",
+  "evidence": "docs how-to/row-level-security",
+  "tags": [
+   "security"
+  ],
+  "visibility": "public",
+  "origin": "curated",
+  "as_of": "2026-10-30"
+ },
+ {
+  "subject": "architecture",
+  "statement": "ctx.sender() (Identity) is the only trustworthy caller identity in a reducer; clients never pass their own player id as an argument.",
+  "confidence": "DOCUMENTED",
+  "evidence": "docs authentication; module rule catalogs",
+  "tags": [
+   "security",
+   "identity"
+  ],
+  "visibility": "public",
+  "origin": "curated",
+  "as_of": "2026-10-30"
+ },
+ {
+  "subject": "architecture",
+  "statement": "Scheduled tables (a table with scheduled(reducer) + ScheduleAt column) are the only timer mechanism: insert a row to schedule, the reducer fires with that row; repeat by Interval or re-insert.",
+  "confidence": "DOCUMENTED",
+  "evidence": "docs how-to games/fixed-rate-game-tick",
+  "tags": [
+   "scheduling",
+   "tick"
+  ],
+  "visibility": "public",
+  "origin": "curated",
+  "as_of": "2026-10-30"
+ },
+ {
+  "subject": "architecture",
+  "statement": "Publishing a new module version is hot-swap: clients stay connected; additive schema changes migrate automatically, destructive ones need --delete-data (wipe) or a manual migration plan.",
+  "confidence": "DOCUMENTED",
+  "evidence": "docs databases (migrations); local adoption notes",
+  "tags": [
+   "deploy",
+   "migration"
+  ],
+  "visibility": "public",
+  "origin": "curated",
+  "as_of": "2026-10-30"
+ },
+ {
+  "subject": "license",
+  "statement": "SpacetimeDB server is BSL 1.1 (Licensed Work = 2.14.0). Additional Use Grant: production use allowed for an application using no more than ONE SpacetimeDB instance in production, and not as a Database Service. Change Date 2031-10-25 -> AGPLv3 with linking exception.",
+  "confidence": "DOCUMENTED",
+  "evidence": "github.com/clockworklabs/SpacetimeDB/blob/master/LICENSE.txt (fetched 2026-10-30)",
+  "tags": [
+   "license",
+   "bsl"
+  ],
+  "visibility": "public",
+  "origin": "curated",
+  "as_of": "2026-10-30"
+ },
+ {
+  "subject": "license",
+  "statement": "Self-hosting a sharded MMO (root + N region databases on a multi-node deployment) likely exceeds 'one SpacetimeDB instance in production' and needs a commercial license or Maincloud; multiple databases inside one standalone instance are a different question - ask Clockwork Labs before launch.",
+  "confidence": "UNVERIFIED",
+  "evidence": "BSL Additional Use Grant wording; whether 'instance' = process or database is not defined in the grant",
+  "tags": [
+   "license",
+   "scale",
+   "risk"
+  ],
+  "visibility": "public",
+  "origin": "curated",
+  "as_of": "2026-10-30"
+ },
+ {
+  "subject": "license",
+  "statement": "Subdirectories with their own LICENSE are Apache-2.0: docs/, crates/bindings*, sdks/*, templates/*, demo/Blackholio, modules/*, codex-plugin/. The repo-root skills/ folder has no own LICENSE, so it falls under BSL; the identical skills under codex-plugin/ are Apache-2.0.",
+  "confidence": "DOCUMENTED",
+  "evidence": "LICENSE.txt section 2 + per-directory LICENSE files in the master tree",
+  "tags": [
+   "license",
+   "skills"
+  ],
+  "visibility": "public",
+  "origin": "curated",
+  "as_of": "2026-10-30"
+ },
+ {
+  "subject": "license",
+  "statement": "BitCraftPublic (server source of BitCraft Online) is Apache-2.0: patterns and code may be reused with attribution and NOTICE.",
+  "confidence": "DOCUMENTED",
+  "evidence": "local _bitcraft-ref LICENSE; github.com/clockworklabs/BitCraftPublic",
+  "tags": [
+   "license",
+   "bitcraft"
+  ],
+  "visibility": "public",
+  "origin": "curated",
+  "as_of": "2026-10-30"
+ },
+ {
+  "subject": "license",
+  "statement": "The flametime Godot GDScript SDK and its plaught-armor hard fork are MIT; vendoring or patching them is allowed with the copyright notice retained.",
+  "confidence": "DOCUMENTED",
+  "evidence": "github.com/flametime/Godot-SpacetimeDB-SDK; github.com/plaught-armor/Godot-SpacetimeDB-SDK",
+  "tags": [
+   "license",
+   "godot"
+  ],
+  "visibility": "public",
+  "origin": "curated",
+  "as_of": "2026-10-30"
+ },
+ {
+  "subject": "license",
+  "statement": "TES3MP is GPLv3: never copy its code into an Apache/MIT kit; only ideas (state authority split, packet categories) may inform designs.",
+  "confidence": "DOCUMENTED",
+  "evidence": "TES3MP repository license",
+  "tags": [
+   "license",
+   "gpl"
+  ],
+  "visibility": "public",
+  "origin": "curated",
+  "as_of": "2026-10-30"
+ },
+ {
+  "subject": "license",
+  "statement": "Vendor blog posts, essays and release notes carry no open license: the kit should link to them and paraphrase, not copy.",
+  "confidence": "DOCUMENTED",
+  "evidence": "spacetimedb.com footer / no license statement",
+  "tags": [
+   "license"
+  ],
+  "visibility": "public",
+  "origin": "curated",
+  "as_of": "2026-10-30"
+ },
+ {
+  "subject": "scale",
+  "statement": "Clockwork Labs' benchmark (account-transfer transactions end-to-end) reports ~300k TPS (303,920 TPS in the 2026-05-14 run); replicated databases reach the same throughput given enough bandwidth.",
+  "confidence": "VENDOR CLAIM",
+  "evidence": "spacetimedb.com/blog/benchmarking; blog/how-does-spacetime-scale",
+  "tags": [
+   "scale",
+   "benchmark"
+  ],
+  "visibility": "public",
+  "origin": "curated",
+  "as_of": "2026-10-30"
+ },
+ {
+  "subject": "scale",
+  "statement": "Benchmark TPS (tiny transfer reducers) does not translate to MMO capacity; game cost is dominated by subscription fan-out (rows x subscribers x update rate) and per-tick reducer work. Measure your own workload.",
+  "confidence": "ESTIMATE",
+  "evidence": "local load tests; architecture reasoning",
+  "tags": [
+   "scale",
+   "subscriptions"
+  ],
+  "visibility": "public",
+  "origin": "curated",
+  "as_of": "2026-10-30"
+ },
+ {
+  "subject": "scale",
+  "statement": "BitCraft runs a root/global database plus spatial region databases; regions execute in parallel and players move between region databases. This is the vendor-blessed MMO scale-out pattern.",
+  "confidence": "VENDOR CLAIM",
+  "evidence": "blog/how-does-spacetime-scale; BitCraftPublic global_module + game packages",
+  "tags": [
+   "scale",
+   "sharding",
+   "bitcraft"
+  ],
+  "visibility": "public",
+  "origin": "curated",
+  "as_of": "2026-10-30"
+ },
+ {
+  "subject": "scale",
+  "statement": "BitCraft reported lag at roughly 500-700 players in one region at launch; plan a working ceiling of ~500 concurrent active players per region database until your own load test says otherwise.",
+  "confidence": "ESTIMATE",
+  "evidence": "research spike 2026-10-30 (BitCraft launch reports + vendor statements); see scale facts",
+  "tags": [
+   "scale",
+   "capacity"
+  ],
+  "visibility": "public",
+  "origin": "curated",
+  "as_of": "2026-10-30"
+ },
+ {
+  "subject": "scale",
+  "statement": "BitCraft's Steam concurrent peak was ~4.4k players spread over ~9 region databases plus a global database - evidence that region sharding, not one big database, is how a live STDB MMO reaches thousands.",
+  "confidence": "MEASURED",
+  "evidence": "SteamDB peak + BitCraft region count (research spike 2026-10-30)",
+  "tags": [
+   "scale",
+   "bitcraft"
+  ],
+  "visibility": "public",
+  "origin": "curated",
+  "as_of": "2026-10-30"
+ },
+ {
+  "subject": "scale",
+  "statement": "Vendor scale roadmap: (1) replicated databases - shipped; (2) async inter-database communication - Oct 31 2026; (3) tiered storage - Oct 31 2026; (4) read replicas - planned; (5) sync IDC / cross-db transactions - planned; (6) intra-database partitioning - planned.",
+  "confidence": "VENDOR CLAIM",
+  "evidence": "blog/how-does-spacetime-scale table",
+  "tags": [
+   "scale",
+   "roadmap",
+   "idc"
+  ],
+  "visibility": "public",
+  "origin": "curated",
+  "as_of": "2026-10-30"
+ },
+ {
+  "subject": "scale",
+  "statement": "v2.14.0 (2026-10-30) ships async inter-database calls for Rust and TypeScript modules: dependencies declared in spacetime.json, insert-only outbox tables, an HTTP/2 delivery actor and on_result callbacks. Delivery is currently same-host/localhost only.",
+  "confidence": "DOCUMENTED",
+  "evidence": "release v2.14.0 notes; PR #6156",
+  "tags": [
+   "idc",
+   "2.14",
+   "sharding"
+  ],
+  "visibility": "public",
+  "origin": "curated",
+  "as_of": "2026-10-30"
+ },
+ {
+  "subject": "scale",
+  "statement": "Tiered storage was announced for the Oct 31 2026 launch but is not in the 2.14.0 release notes; treat it as not shipped until a release lists it.",
+  "confidence": "UNVERIFIED",
+  "evidence": "v2.14.0 notes vs blog roadmap; PRs #6304 'Tiered storage base' and #6305 'Integrate tiered storage' still open as of 2026-10-30",
+  "tags": [
+   "roadmap",
+   "storage"
+  ],
+  "visibility": "public",
+  "origin": "curated",
+  "as_of": "2026-10-30"
+ },
+ {
+  "subject": "scale",
+  "statement": "Without sync IDC there are no cross-database transactions: a player handoff between region databases must be an idempotent multi-step protocol (lock -> offer -> accept -> delete source -> activate) that tolerates retries and partial failure.",
+  "confidence": "DOCUMENTED",
+  "evidence": "IDC design (async, at-least-once outbox) + BitCraft handoff code",
+  "tags": [
+   "sharding",
+   "handoff",
+   "idc"
+  ],
+  "visibility": "public",
+  "origin": "curated",
+  "as_of": "2026-10-30"
+ },
+ {
+  "subject": "scale",
+  "statement": "All in-memory: table data must fit in RAM of the host; size large static world data (terrain, item defs) deliberately and keep cold history out of hot tables until tiered storage ships.",
+  "confidence": "DOCUMENTED",
+  "evidence": "architecture docs; tiered storage roadmap",
+  "tags": [
+   "memory",
+   "scale"
+  ],
+  "visibility": "public",
+  "origin": "curated",
+  "as_of": "2026-10-30"
+ },
+ {
+  "subject": "scale",
+  "statement": "Since 2.13, HTTP reducer calls wait for durability; a 504 means the outcome is unknown, so any externally-triggered reducer must be idempotent (request ids / dedup table).",
+  "confidence": "DOCUMENTED",
+  "evidence": "release v2.13.0 notes",
+  "tags": [
+   "2.13",
+   "idempotency"
+  ],
+  "visibility": "public",
+  "origin": "curated",
+  "as_of": "2026-10-30"
+ },
+ {
+  "subject": "scale",
+  "statement": "Small-scale reference point: Classic open-source multiplayer mods typically see tens of concurrent real players; a Godot+STDB hobby MMO should first prove 50-100 bots before chasing 1,000+.",
+  "confidence": "ESTIMATE",
+  "evidence": "TES3MP community numbers; local staged scale plan",
+  "tags": [
+   "scale",
+   "planning"
+  ],
+  "visibility": "public",
+  "origin": "curated",
+  "as_of": "2026-10-30"
+ },
+ {
+  "subject": "scale",
+  "statement": "A staged load plan that worked locally: Stage 1 = 10 humans/bots functional; Stage 2 = 100 bots with budgets; Stage 3 = 1,000 bots on one region; Stage 4 = 5,000 bots across regions with handoff.",
+  "confidence": "ESTIMATE",
+  "evidence": "research spike 2026-10-30 staged plan (generalized)",
+  "tags": [
+   "load-test",
+   "planning"
+  ],
+  "visibility": "public",
+  "origin": "field-experience",
+  "as_of": "2026-10-30"
+ },
+ {
+  "subject": "versions",
+  "statement": "Pin exact SpacetimeDB versions (CLI, server, module crate, client SDK) per project; never float 'latest'. Upgrade server before modules for 2.14 (is_internal semantics changed).",
+  "confidence": "LOCAL",
+  "evidence": "v2.14.0 notes; field experience",
+  "tags": [
+   "versions",
+   "ops"
+  ],
+  "visibility": "public",
+  "origin": "field-experience",
+  "as_of": "2026-10-30"
+ },
+ {
+  "subject": "versions",
+  "statement": "Never open the only copy of a database's data directory with a newer server binary; upgrades are one-way. Copy the data dir, run the new binary side-by-side on a different port, verify, then cut over.",
+  "confidence": "LOCAL",
+  "evidence": "maintainer's own STDB projects (generalized)",
+  "tags": [
+   "versions",
+   "ops",
+   "backup"
+  ],
+  "visibility": "public",
+  "origin": "field-experience",
+  "as_of": "2026-10-30"
+ },
+ {
+  "subject": "versions",
+  "statement": "Rust modules on 2.13+ need a recent toolchain (MSRV 1.97, pin an exact toolchain such as 1.97.1); pin with rust-toolchain.toml in the module folder.",
+  "confidence": "LOCAL",
+  "evidence": "maintainer's own STDB projects (generalized)",
+  "tags": [
+   "rust",
+   "versions"
+  ],
+  "visibility": "public",
+  "origin": "field-experience",
+  "as_of": "2026-10-30"
+ },
+ {
+  "subject": "versions",
+  "statement": "2.12 rejects HS256-signed JWTs (use RS256/ES256 OIDC issuers), deduplicates scheduler entries, adds Rust module test utilities and C#/TS client auto-reconnect.",
+  "confidence": "DOCUMENTED",
+  "evidence": "release v2.12.0 notes",
+  "tags": [
+   "2.12",
+   "auth"
+  ],
+  "visibility": "public",
+  "origin": "curated",
+  "as_of": "2026-10-30"
+ },
+ {
+  "subject": "versions",
+  "statement": "2.10.2 canonicalized database namespaces; 2.11 improved publish/update diagnostics (schema-change explanations).",
+  "confidence": "DOCUMENTED",
+  "evidence": "release notes v2.10.2, v2.11.0",
+  "tags": [
+   "versions"
+  ],
+  "visibility": "public",
+  "origin": "curated",
+  "as_of": "2026-10-30"
+ },
+ {
+  "subject": "versions",
+  "statement": "Official agent support: spacetimedb.com/agent-setup.md, /llms.txt, /.well-known/agent-skills/index.json, an MCP server and per-language SKILL.md files (cli, concepts, rust-server, typescript-server, csharp-server, cpp-server, typescript-client, csharp-client, unity, unreal, mcp).",
+  "confidence": "DOCUMENTED",
+  "evidence": "spacetimedb.com/llms.txt; monorepo codex-plugin/",
+  "tags": [
+   "ai",
+   "skills"
+  ],
+  "visibility": "public",
+  "origin": "curated",
+  "as_of": "2026-10-30"
+ },
+ {
+  "subject": "client",
+  "statement": "The Godot GDScript SDK (flametime 0.2.x, 2.3.0+) requires a primary key on every table for the client cache; tables without one only fire insert/delete callbacks and are not stored.",
+  "confidence": "DOCUMENTED",
+  "evidence": "flametime SDK README limitations",
+  "tags": [
+   "godot",
+   "sdk"
+  ],
+  "visibility": "public",
+  "origin": "curated",
+  "as_of": "2026-10-30"
+ },
+ {
+  "subject": "client",
+  "statement": "The GDScript SDK does not ref-count overlapping subscriptions; AOI code should subscribe/unsubscribe per cell (one query set per chunk) rather than re-issuing a big overlapping query.",
+  "confidence": "LOCAL",
+  "evidence": "maintainer's own STDB projects (generalized)",
+  "tags": [
+   "godot",
+   "aoi",
+   "subscriptions"
+  ],
+  "visibility": "public",
+  "origin": "field-experience",
+  "as_of": "2026-10-30"
+ },
+ {
+  "subject": "client",
+  "statement": "Brotli compression is not supported by the Godot SDK; use NONE or GZIP.",
+  "confidence": "DOCUMENTED",
+  "evidence": "flametime SDK README",
+  "tags": [
+   "godot"
+  ],
+  "visibility": "public",
+  "origin": "curated",
+  "as_of": "2026-10-30"
+ },
+ {
+  "subject": "client",
+  "statement": "Isolate the SDK behind one seam (e.g. Net.gd / net.ts) that owns connect, subscribe, reducer calls and reconnect; gameplay code reads the local cache only. This made SDK forks/upgrades and bot clients cheap.",
+  "confidence": "LOCAL",
+  "evidence": "maintainer's own STDB projects (generalized)",
+  "tags": [
+   "client",
+   "architecture"
+  ],
+  "visibility": "public",
+  "origin": "field-experience",
+  "as_of": "2026-10-30"
+ },
+ {
+  "subject": "client",
+  "statement": "Rust/C# SDK clients must pump messages (frame_tick / run_threaded / FrameTick in Unity Update); forgetting it looks like 'connected but no data'.",
+  "confidence": "DOCUMENTED",
+  "evidence": "SDK docs; module rule catalogs",
+  "tags": [
+   "sdk",
+   "gotcha"
+  ],
+  "visibility": "public",
+  "origin": "curated",
+  "as_of": "2026-10-30"
+ },
+ {
+  "subject": "process",
+  "statement": "Agents writing STDB Rust modules hallucinate APIs from pre-1.0 and other crates at a high rate; a checked-in rules file with a 'wrong vs right' catalog plus a compile gate is the most effective mitigation.",
+  "confidence": "LOCAL",
+  "evidence": "template server/CLAUDE.md catalog; repeated local fixes",
+  "tags": [
+   "ai",
+   "rust"
+  ],
+  "visibility": "public",
+  "origin": "field-experience",
+  "as_of": "2026-10-30"
+ },
+ {
+  "subject": "process",
+  "statement": "Two-identity tests (two separate client identities) catch most authority bugs: unauthorized joins, cross-player writes and idempotent grants.",
+  "confidence": "LOCAL",
+  "evidence": "maintainer's own STDB projects (generalized)",
+  "tags": [
+   "testing",
+   "security"
+  ],
+  "visibility": "public",
+  "origin": "field-experience",
+  "as_of": "2026-10-30"
+ },
+ {
+  "subject": "process",
+  "statement": "Revoking a player's access in tables does not close an existing websocket; enforce admission in every reducer (and on connect) or restart/kick, otherwise a revoked client keeps its live subscription.",
+  "confidence": "LOCAL",
+  "evidence": "maintainer's own STDB projects (generalized)",
+  "tags": [
+   "security",
+   "admission"
+  ],
+  "visibility": "public",
+  "origin": "field-experience",
+  "as_of": "2026-10-30"
+ },
+ {
+  "subject": "process",
+  "statement": "init only runs on first publish; additive publishes do not re-run it. Seed/backfill new tables with idempotent ensure_* reducers or a migration-version table.",
+  "confidence": "LOCAL",
+  "evidence": "template patterns + local migrations",
+  "tags": [
+   "migration"
+  ],
+  "visibility": "public",
+  "origin": "field-experience",
+  "as_of": "2026-10-30"
+ },
+ {
+  "subject": "process",
+  "statement": "A load-test gate with budgets.json (p95 tick ms, reducer ms, subscription bytes/s, must_plateau memory) and a PASS/CONCERNS/FAIL verdict stopped regressions reaching playtests.",
+  "confidence": "LOCAL",
+  "evidence": "template netcode gate (generalized)",
+  "tags": [
+   "load-test",
+   "ci"
+  ],
+  "visibility": "public",
+  "origin": "field-experience",
+  "as_of": "2026-10-30"
+ },
+ {
+  "subject": "process",
+  "statement": "Off-tick heavy compute (pathfinding, mob AI, mapgen) worked best in a native sidecar process connected as a privileged SDK client that commits results through service-gated reducers.",
+  "confidence": "LOCAL",
+  "evidence": "maintainer's own STDB projects (generalized)",
+  "tags": [
+   "sidecar",
+   "architecture"
+  ],
+  "visibility": "public",
+  "origin": "field-experience",
+  "as_of": "2026-10-30"
+ }
+]

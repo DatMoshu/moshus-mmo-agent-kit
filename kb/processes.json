@@ -1,0 +1,103 @@
+[
+ {
+  "name": "Milestone with acceptance and stop rules",
+  "summary": "Every milestone states owner outcome, acceptance evidence, stop/rollback rules.",
+  "steps": "north star -> milestone (outcome, acceptance, evidence, stop rule) -> tasks -> evidence run -> review -> accept",
+  "tags": [
+   "planning"
+  ],
+  "origin": "field-experience",
+  "visibility": "public"
+ },
+ {
+  "name": "Current-stable adoption",
+  "summary": "How to move a project to a new STDB release.",
+  "steps": "compatibility matrix (CLI/server/crate/SDK/toolchain) -> read release notes -> separate pinned install -> copied data, alt port -> functional evidence (two identities, persistence, reconnect) -> rollback plan -> decision record",
+  "tags": [
+   "versions"
+  ],
+  "origin": "field-experience",
+  "visibility": "public"
+ },
+ {
+  "name": "Private playtest",
+  "summary": "Run an invite-only playtest safely.",
+  "steps": "fresh isolated world -> allowlist admission server-side -> reserve the host -> publish pinned build -> smoke with two identities -> invite -> monitor tick_health -> collect feedback -> wind down + backup",
+  "tags": [
+   "playtest"
+  ],
+  "origin": "field-experience",
+  "visibility": "public"
+ },
+ {
+  "name": "AI-assisted module change",
+  "summary": "Agent writes module code reliably.",
+  "steps": "load rules catalog -> plan tables/reducers -> write -> hallucination check -> cargo check/test -> publish to local -> regen bindings -> client smoke -> review",
+  "tags": [
+   "ai"
+  ],
+  "origin": "field-experience",
+  "visibility": "public"
+ },
+ {
+  "name": "Load test cadence",
+  "summary": "Scale confidence by stages.",
+  "steps": "10 -> 100 -> 1,000 -> 5,000 bots; each stage must PASS budgets before the next; record hardware and versions",
+  "tags": [
+   "load-test"
+  ],
+  "origin": "field-experience",
+  "visibility": "public"
+ },
+ {
+  "name": "Worktree-per-task",
+  "summary": "Parallel agents without stepping on each other.",
+  "steps": "one task = one branch + worktree outside the repo; evidence outside repo; merge via review; remove worktree",
+  "tags": [
+   "workflow"
+  ],
+  "origin": "field-experience",
+  "visibility": "public"
+ },
+ {
+  "name": "Incident response",
+  "summary": "When a live world degrades.",
+  "steps": "check tick_health -> spacetime logs -> identify hot reducer/subscription -> throttle/feature-flag -> hotfix publish (additive) -> postmortem with ADR",
+  "tags": [
+   "ops"
+  ],
+  "origin": "curated",
+  "visibility": "public"
+ },
+ {
+  "name": "Backup and restore drill",
+  "summary": "Prove recovery before players depend on it.",
+  "steps": "stop or snapshot -> copy data dir/commitlog -> restore on alt port with same binary -> verify row counts and two-identity login",
+  "tags": [
+   "ops",
+   "backup"
+  ],
+  "origin": "curated",
+  "visibility": "public"
+ },
+ {
+  "name": "Release review",
+  "summary": "Evaluate a new STDB release.",
+  "steps": "read notes + PRs, classify breaking/perf/features, test in sandbox, update KB facts + pins, publish advisory",
+  "tags": [
+   "versions"
+  ],
+  "origin": "curated",
+  "visibility": "public"
+ },
+ {
+  "name": "ADR practice",
+  "summary": "Record decisions with context and consequences.",
+  "steps": "ADR per significant choice (topology, auth, AOI, sharding), status proposed->accepted->superseded",
+  "tags": [
+   "docs"
+  ],
+  "origin": "curated",
+  "visibility": "public"
+ }
+]

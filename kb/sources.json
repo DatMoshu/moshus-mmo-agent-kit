@@ -1,0 +1,398 @@
+[
+ {
+  "url": "https://raw.githubusercontent.com/clockworklabs/SpacetimeDB/master/README.md",
+  "kind": "web_repo",
+  "title": "SpacetimeDB README",
+  "license": "BSL-1.1 (repo root)",
+  "redistribution": "link_only",
+  "visibility": "public",
+  "note": "link and paraphrase only"
+ },
+ {
+  "url": "https://raw.githubusercontent.com/clockworklabs/SpacetimeDB/master/LICENSE.txt",
+  "kind": "web_license",
+  "title": "SpacetimeDB LICENSE.txt (BSL 1.1 + subdirectory licenses)",
+  "license": "BSL-1.1",
+  "redistribution": "link_only",
+  "visibility": "public",
+  "note": "link and paraphrase only"
+ },
+ {
+  "url": "https://raw.githubusercontent.com/clockworklabs/SpacetimeDB/master/AGENTS.md",
+  "kind": "web_repo",
+  "title": "SpacetimeDB AGENTS.md (repo contributor agent rules)",
+  "license": "BSL-1.1 (repo root)",
+  "redistribution": "link_only",
+  "visibility": "public",
+  "note": "link and paraphrase only"
+ },
+ {
+  "url": "https://raw.githubusercontent.com/clockworklabs/SpacetimeDB/master/crates/bench/README.md",
+  "kind": "web_repo",
+  "title": "SpacetimeDB crates/bench README",
+  "license": "Apache-2.0",
+  "redistribution": "attribution",
+  "visibility": "public",
+  "note": "open license; attribute"
+ },
+ {
+  "url": "https://raw.githubusercontent.com/clockworklabs/SpacetimeDB/master/sdks/csharp/README.md",
+  "kind": "web_sdk",
+  "title": "C# / Unity SDK README",
+  "license": "Apache-2.0",
+  "redistribution": "attribution",
+  "visibility": "public",
+  "note": "open license; attribute"
+ },
+ {
+  "url": "https://raw.githubusercontent.com/clockworklabs/SpacetimeDB/master/sdks/unreal/README.md",
+  "kind": "web_sdk",
+  "title": "Unreal SDK README",
+  "license": "Apache-2.0",
+  "redistribution": "attribution",
+  "visibility": "public",
+  "note": "open license; attribute"
+ },
+ {
+  "url": "https://spacetimedb.com/llms.txt",
+  "kind": "web_doc",
+  "title": "spacetimedb.com llms.txt",
+  "license": "vendor site (no explicit license)",
+  "redistribution": "link_only",
+  "visibility": "public",
+  "note": "link and paraphrase only"
+ },
+ {
+  "url": "https://spacetimedb.com/agent-setup.md",
+  "kind": "web_doc",
+  "title": "Official agent setup instructions",
+  "license": "vendor site (no explicit license)",
+  "redistribution": "link_only",
+  "visibility": "public",
+  "note": "link and paraphrase only"
+ },
+ {
+  "url": "https://spacetimedb.com/.well-known/agent-skills/index.json",
+  "kind": "web_doc",
+  "title": "Official agent-skills discovery index",
+  "license": "vendor site",
+  "redistribution": "link_only",
+  "visibility": "public",
+  "note": "link and paraphrase only"
+ },
+ {
+  "url": "https://spacetimedb.com/blog/how-does-spacetime-scale",
+  "kind": "web_blog",
+  "title": "Ok, but does it scale? (Cloutier, 2026-09-03)",
+  "license": "vendor blog, all rights reserved",
+  "redistribution": "link_only",
+  "visibility": "public",
+  "note": "link and paraphrase only"
+ },
+ {
+  "url": "https://spacetimedb.com/blog/okay-but-does-it-need-to-scale",
+  "kind": "web_blog",
+  "title": "Okay, but does it need to scale?",
+  "license": "vendor blog, all rights reserved",
+  "redistribution": "link_only",
+  "visibility": "public",
+  "note": "link and paraphrase only"
+ },
+ {
+  "url": "https://spacetimedb.com/blog/benchmarking",
+  "kind": "web_blog",
+  "title": "Let's talk benchmarks (2026-05-14)",
+  "license": "vendor blog, all rights reserved",
+  "redistribution": "link_only",
+  "visibility": "public",
+  "note": "link and paraphrase only"
+ },
+ {
+  "url": "https://spacetimedb.com/blog/databases-and-data-oriented-design",
+  "kind": "web_blog",
+  "title": "Databases and data-oriented design",
+  "license": "vendor blog, all rights reserved",
+  "redistribution": "link_only",
+  "visibility": "public",
+  "note": "link and paraphrase only"
+ },
+ {
+  "url": "https://spacetimedb.com/blog/introducing-spacetimedb-1-0",
+  "kind": "web_blog",
+  "title": "Introducing SpacetimeDB 1.0",
+  "license": "vendor blog, all rights reserved",
+  "redistribution": "link_only",
+  "visibility": "public",
+  "note": "link and paraphrase only"
+ },
+ {
+  "url": "https://spacetimedb.com/blog/building-with-claude-code",
+  "kind": "web_blog",
+  "title": "Building with Claude Code",
+  "license": "vendor blog, all rights reserved",
+  "redistribution": "link_only",
+  "visibility": "public",
+  "note": "link and paraphrase only"
+ },
+ {
+  "url": "https://spacetimedb.com/blog/official-support-for-unreal-engine",
+  "kind": "web_blog",
+  "title": "Official support for Unreal Engine",
+  "license": "vendor blog, all rights reserved",
+  "redistribution": "link_only",
+  "visibility": "public",
+  "note": "link and paraphrase only"
+ },
+ {
+  "url": "https://spacetimedb.com/blog/who-are-you",
+  "kind": "web_blog",
+  "title": "Who are you? (identity/auth)",
+  "license": "vendor blog, all rights reserved",
+  "redistribution": "link_only",
+  "visibility": "public",
+  "note": "link and paraphrase only"
+ },
+ {
+  "url": "https://spacetimedb.com/blog/video-conferencing-over-a-database-with-spacetimedb",
+  "kind": "web_blog",
+  "title": "Video conferencing over a database",
+  "license": "vendor blog, all rights reserved",
+  "redistribution": "link_only",
+  "visibility": "public",
+  "note": "link and paraphrase only"
+ },
+ {
+  "url": "https://spacetimedb.com/blog/all-new-spacetimedb-pricing",
+  "kind": "web_blog",
+  "title": "All-new SpacetimeDB pricing",
+  "license": "vendor blog, all rights reserved",
+  "redistribution": "link_only",
+  "visibility": "public",
+  "note": "link and paraphrase only"
+ },
+ {
+  "url": "https://bitcraftonline.com/news/spacetimedb-and-bitcraft",
+  "kind": "web_blog",
+  "title": "SpacetimeDB and BitCraft (BitCraft news)",
+  "license": "vendor site, all rights reserved",
+  "redistribution": "link_only",
+  "visibility": "public",
+  "note": "link and paraphrase only"
+ },
+ {
+  "url": "https://raw.githubusercontent.com/clockworklabs/BitCraftPublic/master/README.md",
+  "kind": "web_repo",
+  "title": "BitCraftPublic README",
+  "license": "Apache-2.0",
+  "redistribution": "attribution",
+  "visibility": "public",
+  "note": "open license; attribute"
+ },
+ {
+  "url": "https://raw.githubusercontent.com/clockworklabs/BitCraftPublic/main/README.md",
+  "kind": "web_repo",
+  "title": "BitCraftPublic README (main)",
+  "license": "Apache-2.0",
+  "redistribution": "attribution",
+  "visibility": "public",
+  "note": "open license; attribute"
+ },
+ {
+  "url": "https://raw.githubusercontent.com/flametime/Godot-SpacetimeDB-SDK/0.2/README.md",
+  "kind": "web_sdk",
+  "title": "flametime Godot GDScript SDK README",
+  "license": "MIT",
+  "redistribution": "allowed",
+  "visibility": "public",
+  "note": "open license; attribute"
+ },
+ {
+  "url": "https://raw.githubusercontent.com/flametime/Godot-SpacetimeDB-SDK/0.2/docs/quickstart.md",
+  "kind": "web_sdk",
+  "title": "flametime Godot SDK quickstart",
+  "license": "MIT",
+  "redistribution": "allowed",
+  "visibility": "public",
+  "note": "open license; attribute"
+ },
+ {
+  "url": "https://raw.githubusercontent.com/flametime/Godot-SpacetimeDB-SDK/0.2/docs/codegen.md",
+  "kind": "web_sdk",
+  "title": "flametime Godot SDK codegen",
+  "license": "MIT",
+  "redistribution": "allowed",
+  "visibility": "public",
+  "note": "open license; attribute"
+ },
+ {
+  "url": "https://raw.githubusercontent.com/plaught-armor/Godot-SpacetimeDB-SDK/main/README.md",
+  "kind": "web_sdk",
+  "title": "plaught-armor Godot SDK hard fork README",
+  "license": "MIT",
+  "redistribution": "allowed",
+  "visibility": "public",
+  "note": "open license; attribute"
+ },
+ {
+  "url": "https://raw.githubusercontent.com/clockworklabs/spacetimedb-cookbook/master/README.md",
+  "kind": "web_repo",
+  "title": "spacetimedb-cookbook README",
+  "license": "Apache-2.0",
+  "redistribution": "attribution",
+  "visibility": "public",
+  "note": "open license; attribute"
+ },
+ {
+  "url": "https://raw.githubusercontent.com/Spitfire-Products/stdb-cookbook/main/README.md",
+  "kind": "web_community",
+  "title": "Spitfire stdb-cookbook (production patterns)",
+  "license": "unknown",
+  "redistribution": "link_only",
+  "visibility": "public",
+  "note": "link and paraphrase only"
+ },
+ {
+  "url": "https://raw.githubusercontent.com/tamaro-skaljic/SpacetimeDSL/main/README.md",
+  "kind": "web_community",
+  "title": "SpacetimeDSL (Rust module meta-framework)",
+  "license": "unknown",
+  "redistribution": "link_only",
+  "visibility": "public",
+  "note": "link and paraphrase only"
+ },
+ {
+  "url": "https://raw.githubusercontent.com/Gazz-Stripbolt/spacetimedb-predict/main/README.md",
+  "kind": "web_community",
+  "title": "spacetimedb-predict (client prediction)",
+  "license": "unknown",
+  "redistribution": "link_only",
+  "visibility": "public",
+  "note": "link and paraphrase only"
+ },
+ {
+  "url": "https://github.com/topics/spacetimedb",
+  "kind": "web_community",
+  "title": "GitHub topic: spacetimedb (community index)",
+  "license": "GitHub page",
+  "redistribution": "link_only",
+  "visibility": "public",
+  "note": "link and paraphrase only"
+ },
+ {
+  "url": "https://spacetimedb.com/essays/spacetime/01-spacetimedb-became-spacetime.md",
+  "kind": "web_essay",
+  "title": "Spacetime essay: 01-spacetimedb-became-spacetime",
+  "license": "vendor site, all rights reserved",
+  "redistribution": "link_only",
+  "visibility": "public",
+  "note": "link and paraphrase only"
+ },
+ {
+  "url": "https://spacetimedb.com/essays/spacetime/02-a-distributed-operating-system.md",
+  "kind": "web_essay",
+  "title": "Spacetime essay: 02-a-distributed-operating-system",
+  "license": "vendor site, all rights reserved",
+  "redistribution": "link_only",
+  "visibility": "public",
+  "note": "link and paraphrase only"
+ },
+ {
+  "url": "https://spacetimedb.com/essays/spacetime/03-performance-that-changes-the-design.md",
+  "kind": "web_essay",
+  "title": "Spacetime essay: 03-performance-that-changes-the-design",
+  "license": "vendor site, all rights reserved",
+  "redistribution": "link_only",
+  "visibility": "public",
+  "note": "link and paraphrase only"
+ },
+ {
+  "url": "https://spacetimedb.com/essays/spacetime/04-the-reactive-backend-is-the-future.md",
+  "kind": "web_essay",
+  "title": "Spacetime essay: 04-the-reactive-backend-is-the-future",
+  "license": "vendor site, all rights reserved",
+  "redistribution": "link_only",
+  "visibility": "public",
+  "note": "link and paraphrase only"
+ },
+ {
+  "url": "https://spacetimedb.com/essays/spacetime/05-building-a-crud-app.md",
+  "kind": "web_essay",
+  "title": "Spacetime essay: 05-building-a-crud-app",
+  "license": "vendor site, all rights reserved",
+  "redistribution": "link_only",
+  "visibility": "public",
+  "note": "link and paraphrase only"
+ },
+ {
+  "url": "https://spacetimedb.com/essays/spacetime/06-like-convex-faster-and-cheaper.md",
+  "kind": "web_essay",
+  "title": "Spacetime essay: 06-like-convex-faster-and-cheaper",
+  "license": "vendor site, all rights reserved",
+  "redistribution": "link_only",
+  "visibility": "public",
+  "note": "link and paraphrase only"
+ },
+ {
+  "url": "https://spacetimedb.com/essays/spacetime/07-agents-need-a-place-to-work.md",
+  "kind": "web_essay",
+  "title": "Spacetime essay: 07-agents-need-a-place-to-work",
+  "license": "vendor site, all rights reserved",
+  "redistribution": "link_only",
+  "visibility": "public",
+  "note": "link and paraphrase only"
+ },
+ {
+  "url": "https://spacetimedb.com/essays/spacetime/08-react-state-beyond-the-browser.md",
+  "kind": "web_essay",
+  "title": "Spacetime essay: 08-react-state-beyond-the-browser",
+  "license": "vendor site, all rights reserved",
+  "redistribution": "link_only",
+  "visibility": "public",
+  "note": "link and paraphrase only"
+ },
+ {
+  "url": "https://spacetimedb.com/essays/spacetime/09-fewer-backend-decisions.md",
+  "kind": "web_essay",
+  "title": "Spacetime essay: 09-fewer-backend-decisions",
+  "license": "vendor site, all rights reserved",
+  "redistribution": "link_only",
+  "visibility": "public",
+  "note": "link and paraphrase only"
+ },
+ {
+  "url": "https://spacetimedb.com/essays/spacetime/10-a-backend-for-one-developer.md",
+  "kind": "web_essay",
+  "title": "Spacetime essay: 10-a-backend-for-one-developer",
+  "license": "vendor site, all rights reserved",
+  "redistribution": "link_only",
+  "visibility": "public",
+  "note": "link and paraphrase only"
+ },
+ {
+  "url": "https://spacetimedb.com/essays/spacetime/11-an-ordinary-app-is-a-good-test.md",
+  "kind": "web_essay",
+  "title": "Spacetime essay: 11-an-ordinary-app-is-a-good-test",
+  "license": "vendor site, all rights reserved",
+  "redistribution": "link_only",
+  "visibility": "public",
+  "note": "link and paraphrase only"
+ },
+ {
+  "url": "https://spacetimedb.com/essays/spacetime/12-a-backend-your-coding-agent-can-follow.md",
+  "kind": "web_essay",
+  "title": "Spacetime essay: 12-a-backend-your-coding-agent-can-follow",
+  "license": "vendor site, all rights reserved",
+  "redistribution": "link_only",
+  "visibility": "public",
+  "note": "link and paraphrase only"
+ },
+ {
+  "url": "https://spacetimedb.com/essays/spacetime/13-install-the-boring-parts-of-your-backend.md",
+  "kind": "web_essay",
+  "title": "Spacetime essay: 13-install-the-boring-parts-of-your-backend",
+  "license": "vendor site, all rights reserved",
+  "redistribution": "link_only",
+  "visibility": "public",
+  "note": "link and paraphrase only"
+ }
+]

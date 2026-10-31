@@ -1,0 +1,62 @@
+[
+ {
+  "ref": "KIT-001",
+  "title": "Default topology is single module",
+  "decision": "Ship single-module starter; sharding is an opt-in guide + example once load tests require it.",
+  "context": "Most hobby MMOs never exceed one region's capacity.",
+  "consequences": "Simple first run; documented path to scale.",
+  "status": "proposed",
+  "project": "kit",
+  "visibility": "public"
+ },
+ {
+  "ref": "KIT-002",
+  "title": "Rust is the reference module language",
+  "decision": "Primary scaffolds in Rust; TS module scaffold second (2.14 IDC supports both).",
+  "context": "BitCraft and most production STDB games use Rust.",
+  "consequences": "C# module docs link to official.",
+  "status": "proposed",
+  "project": "kit",
+  "visibility": "public"
+ },
+ {
+  "ref": "KIT-003",
+  "title": "Client-agnostic kit with Godot first",
+  "decision": "Provide Godot (GDScript SDK, pinned/vendored MIT) and web (TS) starters first; Unity/Unreal starters follow official SDKs.",
+  "context": "Godot has a mature community SDK; web is easiest to try.",
+  "consequences": "",
+  "status": "proposed",
+  "project": "kit",
+  "visibility": "public"
+ },
+ {
+  "ref": "KIT-004",
+  "title": "License: MIT or Apache-2.0 for the kit",
+  "decision": "Kit content is original or Apache/MIT-derived with attribution; vendor blogs/BSL code are linked, not copied; GPL never copied.",
+  "context": "Shareable kit.",
+  "consequences": "NOTICE file required.",
+  "status": "proposed",
+  "project": "kit",
+  "visibility": "public"
+ },
+ {
+  "ref": "KIT-005",
+  "title": "Pinned versions file",
+  "decision": "stdb.lock (or versions.toml) pins CLI/server/crate/SDK/toolchain; scripts read it.",
+  "context": "Floating 'latest' breaks builds.",
+  "consequences": "",
+  "status": "proposed",
+  "project": "kit",
+  "visibility": "public"
+ },
+ {
+  "ref": "KIT-006",
+  "title": "Agent-runtime neutral",
+  "decision": "Agents/skills as plain Markdown with front-matter usable by Claude Code, Codex, Cursor and others; official STDB skills referenced, not forked.",
+  "context": "People use many agent runtimes.",
+  "consequences": "",
+  "status": "proposed",
+  "project": "kit",
+  "visibility": "public"
+ }
+]

@@ -1,0 +1,272 @@
+[
+ {
+  "name": "Single-module world (start here)",
+  "problem": "Small/medium game wants simplest topology.",
+  "solution": "One database holds world, players and economy. Shard only when load tests show the region ceiling.",
+  "tradeoffs": "Simple; caps at one core's capacity (~hundreds of active players).",
+  "used_in": "field-tested",
+  "tags": [
+   "topology"
+  ],
+  "origin": "field-experience",
+  "evidence": ""
+ },
+ {
+  "name": "Global + region shards",
+  "problem": "World needs more than one database's capacity.",
+  "solution": "Root/global database owns accounts, chat, economy ledger, region directory; region databases own spatial simulation. Clients connect to global + current region.",
+  "tradeoffs": "Cross-region ops become async protocols; ops overhead.",
+  "used_in": "BitCraft",
+  "tags": [
+   "topology",
+   "sharding"
+  ],
+  "origin": "curated",
+  "evidence": "BitCraftPublic global_module + game"
+ },
+ {
+  "name": "Region handoff state machine",
+  "problem": "Moving a player between databases without dupes/loss.",
+  "solution": "lock (source marks player in_transit) -> offer (outbox/IDC to target with snapshot + request id) -> accept (target inserts inactive copy, acks) -> delete (source removes) -> activate (target enables, client switches subscription). Every step idempotent keyed by transfer id; timeouts roll back to source.",
+  "tradeoffs": "Latency of 2 round trips; needs reconciliation sweeper.",
+  "used_in": "BitCraft-style",
+  "tags": [
+   "sharding",
+   "handoff",
+   "idc"
+  ],
+  "origin": "curated",
+  "evidence": ""
+ },
+ {
+  "name": "Fixed-rate tick with budget and auto-throttle",
+  "problem": "Simulation work grows with players.",
+  "solution": "Scheduled tick reducer (e.g. 10-20 Hz) measures its own duration, writes tick_health (Green/Yellow/Orange/Red), and sheds optional work (AI frequency, far entities) when over budget.",
+  "tradeoffs": "Requires tuning; tick_health adds a small write per tick.",
+  "used_in": "field-tested",
+  "tags": [
+   "tick",
+   "performance"
+  ],
+  "origin": "field-experience",
+  "evidence": ""
+ },
+ {
+  "name": "Chunk/cell AOI subscriptions",
+  "problem": "Clients must see nearby world only.",
+  "solution": "Partition world into cells; entities store cell_x/cell_y (indexed); client subscribes to its 3x3 (or radius) cells, diffing cell sets on movement; tier subscriptions (near: full rows/high rate; far: summary table).",
+  "tradeoffs": "Cell boundary churn; choose cell size ~ view radius / 1-2.",
+  "used_in": "field-tested",
+  "tags": [
+   "aoi",
+   "subscriptions"
+  ],
+  "origin": "field-experience",
+  "evidence": ""
+ },
+ {
+  "name": "Narrow hot table + wide cold table",
+  "problem": "Position updates bloat bandwidth.",
+  "solution": "Split entity_transform (id, cell, x, y, rot, ts) from entity_info (name, stats, appearance). High-rate subscriptions only touch the narrow table.",
+  "tradeoffs": "Joins on client cache.",
+  "used_in": "field-tested",
+  "tags": [
+   "subscriptions",
+   "bandwidth"
+  ],
+  "origin": "curated",
+  "evidence": ""
+ },
+ {
+  "name": "Entity-component tables",
+  "problem": "Flexible game objects without wide nullable rows.",
+  "solution": "entity(id) + one table per component (health, inventory_slot, ai_state) keyed by entity_id; systems iterate component tables.",
+  "tradeoffs": "More tables/indexes; great for subscriptions by component.",
+  "used_in": "BitCraft, template",
+  "tags": [
+   "ecs",
+   "schema"
+  ],
+  "origin": "curated",
+  "evidence": ""
+ },
+ {
+  "name": "Descriptor tables with generation stamps",
+  "problem": "Static defs change between publishes.",
+  "solution": "item_desc/recipe_desc tables reloaded by stage_* reducers into a new generation, then sweep_* removes old generation; clients key caches by generation.",
+  "tradeoffs": "Two-phase reload complexity.",
+  "used_in": "template, BitCraft static data",
+  "tags": [
+   "static-data",
+   "migration"
+  ],
+  "origin": "field-experience",
+  "evidence": ""
+ },
+ {
+  "name": "Progressive actions",
+  "problem": "Crafting/harvesting take time and must survive disconnects.",
+  "solution": "progressive_action row (actor, kind, started_at, completes_at, target); a scheduled reducer completes or cancels; client shows a progress bar from timestamps.",
+  "tradeoffs": "Need cancellation semantics.",
+  "used_in": "BitCraft, template",
+  "tags": [
+   "gameplay",
+   "scheduling"
+  ],
+  "origin": "curated",
+  "evidence": ""
+ },
+ {
+  "name": "Off-tick native sidecar",
+  "problem": "Heavy compute (pathfinding, mob AI) doesn't fit the tick budget.",
+  "solution": "A native process connects as a service identity via the SDK, subscribes to what it needs, computes, and commits results through reducers that check the caller is the registered service identity.",
+  "tradeoffs": "Extra process to deploy; results are one tick late.",
+  "used_in": "field-tested",
+  "tags": [
+   "sidecar",
+   "ai"
+  ],
+  "origin": "field-experience",
+  "evidence": ""
+ },
+ {
+  "name": "Deterministic seeded procgen",
+  "problem": "World generation must match across server, tools and tests.",
+  "solution": "Hash (seed, x, y, salt) with FNV-1a into a splitmix64 stream; port noise functions bit-exactly and test with golden values.",
+  "tradeoffs": "Floating point must be handled carefully across languages.",
+  "used_in": "field-tested",
+  "tags": [
+   "procgen",
+   "determinism"
+  ],
+  "origin": "field-experience",
+  "evidence": ""
+ },
+ {
+  "name": "Identity broker for third-party auth",
+  "problem": "Players log in with Steam/Google/email.",
+  "solution": "Use an OIDC issuer (SpacetimeAuth or Firebase/Auth0 via a token broker issuing RS256 JWTs); map ctx.sender() -> account row on first connect; keep provider ids in a private table.",
+  "tradeoffs": "Extra service for brokering.",
+  "used_in": "template Firebase broker, Godot SDK Steam guide",
+  "tags": [
+   "auth",
+   "identity"
+  ],
+  "origin": "curated",
+  "evidence": ""
+ },
+ {
+  "name": "Server-side admission",
+  "problem": "Private/invite-only worlds.",
+  "solution": "allowlist table + check in client_connected and every reducer; operator grants are idempotent reducers callable only by an admin identity.",
+  "tradeoffs": "Every reducer pays a lookup (cheap, indexed).",
+  "used_in": "field-tested",
+  "tags": [
+   "security",
+   "admission"
+  ],
+  "origin": "field-experience",
+  "evidence": ""
+ },
+ {
+  "name": "Additive-only migrations + backfill",
+  "problem": "Ship schema changes without wipes.",
+  "solution": "Only add tables/columns-with-defaults; backfill in batches via a scheduled migration reducer; record schema_version; never rely on init.",
+  "tradeoffs": "Old columns linger.",
+  "used_in": "all local projects",
+  "tags": [
+   "migration"
+  ],
+  "origin": "field-experience",
+  "evidence": ""
+ },
+ {
+  "name": "Server-authoritative combat sub-tick",
+  "problem": "Fair combat at modest tick rates.",
+  "solution": "Clients send timestamped intents; server orders them inside the tick by timestamp (clamped to tick window) and resolves hits against server state; clients predict and reconcile.",
+  "tradeoffs": "Complexity in reconciliation.",
+  "used_in": "field-tested",
+  "tags": [
+   "combat",
+   "netcode"
+  ],
+  "origin": "field-experience",
+  "evidence": ""
+ },
+ {
+  "name": "Client SDK seam",
+  "problem": "SDK upgrades/forks ripple through gameplay code.",
+  "solution": "One autoload/service owns the connection; exposes typed signals and intent methods; everything else reads the cache.",
+  "tradeoffs": "",
+  "used_in": "field-tested",
+  "tags": [
+   "client"
+  ],
+  "origin": "field-experience",
+  "evidence": ""
+ },
+ {
+  "name": "Load-test gate",
+  "problem": "Performance regressions slip into playtests.",
+  "solution": "Headless bot clients (SDK) drive scripted sessions; a monitor polls tick_health/metrics; budgets.json defines p95 limits and must_plateau for memory; output PASS/CONCERNS/FAIL and block publish on FAIL.",
+  "tradeoffs": "Needs maintained bot scripts.",
+  "used_in": "field-tested",
+  "tags": [
+   "load-test",
+   "ci"
+  ],
+  "origin": "field-experience",
+  "evidence": ""
+ },
+ {
+  "name": "Outbox + idempotent consumer",
+  "problem": "Talking to other databases/services reliably.",
+  "solution": "Write intents to an insert-only outbox table (2.14 IDC) or a pending_jobs table drained by a procedure/sidecar; consumers dedup by message id.",
+  "tradeoffs": "At-least-once semantics.",
+  "used_in": "v2.14 IDC design",
+  "tags": [
+   "idc",
+   "integration"
+  ],
+  "origin": "curated",
+  "evidence": ""
+ },
+ {
+  "name": "Leaderboards / matchmaking / hidden info via official how-tos",
+  "problem": "Common game features.",
+  "solution": "Follow official how-to recipes: top-100 leaderboard, matchmaking queue, skill-based MM, turn-based, sync nearby entities, hide information, seasonal reset.",
+  "tradeoffs": "",
+  "used_in": "docs how-to/games",
+  "tags": [
+   "recipes"
+  ],
+  "origin": "curated",
+  "evidence": ""
+ },
+ {
+  "name": "Heightmap terrain chunks",
+  "problem": "Editable terrain at scale.",
+  "solution": "terrain_chunk(cx, cy, heights bytes, version); edits patch bytes in a reducer; clients subscribe by chunk cell and rebuild meshes on update.",
+  "tradeoffs": "Large rows: keep chunks small (e.g. 32x32).",
+  "used_in": "BitCraft-like, template",
+  "tags": [
+   "terrain",
+   "world"
+  ],
+  "origin": "field-experience",
+  "evidence": ""
+ },
+ {
+  "name": "Ops: pinned side-by-side runtimes",
+  "problem": "Upgrading STDB without risking data.",
+  "solution": "Install versions side by side, run candidate on another port against a copied data dir, run acceptance + two-identity tests, then switch; keep rollback binary and data copy.",
+  "tradeoffs": "Disk for copies.",
+  "used_in": "field-tested",
+  "tags": [
+   "ops",
+   "versions"
+  ],
+  "origin": "field-experience",
+  "evidence": ""
+ }
+]
