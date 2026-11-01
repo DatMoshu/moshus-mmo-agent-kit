@@ -19,6 +19,12 @@
 ##   Playtest:   --autopilot --route play [--profile P] (chat, enter map 1, talk to an NPC, leave, fight,
 ##               loot, die and respawn; driven by a play_check harness) and --route resume (reconnect check).
 ##   Bench:      --bench [--bench-seconds S] (no server): scripted walk, prints frame times + chunk build times.
+##   Tilesets:   F4 / Shift+F4 next / previous tileset pack (docs/SHARD_CORE.md "Tilesets"); --tileset ID starts
+##               with that pack (not saved); the last pack picked with F4 is saved as render/tileset in
+##               user://settings.cfg. --tileset-dir DIR adds a folder of packs (besides user://tilesets).
+##               --tileset-check [--shots DIR] (no server): cycle every pack on map 0 in the current renderer,
+##               print one TILESET_CHECK line per pack and PASS / FAIL (exit code 0 / 1).
+## HUD hook: a game replaces the core HUD with its own Hud subclass via set_hud() (from Game.extend).
 ##
 ## Layout: core client = net/ (NetSession: server state + AOI + intents), render/ (MapRenderer; TileRenderer2D,
 ## VoxelRenderer3D; TileSource = the adapter contract), ui/ (Hud), core/ (Conversation, DocSource,
@@ -46,6 +52,12 @@ var renderer_kind := ""
 var _renderers := {} # kind -> MapRenderer (kept alive while hidden so switching back is instant)
 var _renderer_opts := {}
 var hud := Hud.new()
+signal hud_changed(hud: Hud)
+signal tileset_changed(id: String)
+const SETTINGS := "user://settings.cfg"
+var tilesets: Array[TilesetPack] = [] # every pack the player can switch to (Tilesets.discover)
+var tileset_id := ""                  # the active pack's id
+var _tileset_live := false            # true after start-up: changes then toast and may be saved
 var _talk: Conversation
 var _talk_npc := -1
 var _target := -1 # last monster attacked (highlighted)
@@ -72,21 +84,114 @@ func _ready() -> void:
 	for kv in String(_args.get("voxel", "")).split(",", false):
 		var p: PackedStringArray = kv.split("=")
 		_renderer_opts[p[0]] = p[1] if p.size() > 1 else "true"
+	_init_tilesets()
 	add_child(hud)
-	hud.visible = _args.has("hud") or not (_args.has("autopilot") or _args.has("bench") or _args.has("shots"))
-	hud.chat_submitted.connect(func(t: String): Net.say(t))
-	hud.talk_submitted.connect(_on_talk_line)
-	hud.talk_closed.connect(func(): _talk = null; _talk_npc = -1)
+	hud.visible = _args.has("hud") or not (_args.has("autopilot") or _args.has("bench") or _args.has("shots") \
+		or _args.has("tileset-check"))
+	_connect_hud()
 	Net.action_result.connect(_on_action_result)
 	var kind := String(_args.get("renderer", OS.get_environment("SHARD_RENDERER")))
 	use_renderer(kind if kind != "" else "2d")
 	Game.extend(self)
+	_tileset_live = true
+	if _args.has("tileset-check"):
+		_tileset_check()
+		return
 	if _args.has("bench"):
 		_bench_start()
 		return
 	Net.session_connected.connect(_on_connected)
 	Net.session_disconnected.connect(func(): _disconnects += 1)
 	Net.connect_to_server(_args.get("url", "http://127.0.0.1:3000"), _args.get("db", "mmo-dev"), _args.get("profile", ""))
+
+
+func _connect_hud() -> void:
+	hud.chat_submitted.connect(func(t: String): Net.say(t))
+	hud.talk_submitted.connect(_on_talk_line)
+	hud.talk_closed.connect(func(): _talk = null; _talk_npc = -1)
+
+
+## HUD hook: replace the core HUD with a game's own. `h` is a Hud subclass (so main's calls and signals keep
+## working: override every method in Hud.FACADE, and skip super._ready() to drop the default widgets). Call it
+## from Game.extend(main); the old HUD is freed, the new one takes its visibility and main's signal wiring.
+## Emits hud_changed. A game that only adds panels next to the default HUD just adds its own CanvasLayer instead.
+func set_hud(h: Hud) -> void:
+	if h == null or h == hud:
+		return
+	var vis := hud.visible
+	if is_instance_valid(hud):
+		if hud.get_parent() == self:
+			remove_child(hud)
+		hud.queue_free()
+	hud = h
+	if hud.get_parent() == null:
+		add_child(hud)
+	hud.visible = vis
+	_connect_hud()
+	_update_hud()
+	hud_changed.emit(hud)
+
+
+## ---------------------------------------------------------------- tilesets
+func _init_tilesets() -> void:
+	var dirs := PackedStringArray([Tilesets.USER_DIR])
+	if _args.has("tileset-dir"):
+		dirs.append(String(_args["tileset-dir"]))
+	tilesets = Tilesets.discover(src, dirs)
+	if tilesets.is_empty():
+		return
+	var want := String(_args.get("tileset", ""))
+	if want == "" and not _args.has("tileset-check"):
+		var cfg := ConfigFile.new()
+		if cfg.load(SETTINGS) == OK:
+			want = String(cfg.get_value("render", "tileset", ""))
+	if want == "" or not set_tileset(want, false):
+		set_tileset(tilesets[0].id, false)
+
+
+## Switch to pack `id` (renderers redraw with it at once; the session is untouched). persist = save it as the
+## player's choice (render/tileset in user://settings.cfg; never in automated runs). false = unknown id.
+func set_tileset(id: String, persist := true) -> bool:
+	var p := Tilesets.find(tilesets, id)
+	if p == null:
+		push_warning("unknown tileset '%s' (have: %s)" % [id, ", ".join(tilesets.map(func(t): return t.id))])
+		return false
+	tileset_id = p.id
+	src.set_tileset(null if p == src.default_tileset() else p)
+	for k in _renderers:
+		_renderers[k].refresh_atlas()
+	if _tileset_live:
+		print("TILESET active=%s" % p.id)
+		var who := " - " + p.credit if p.credit != "" else ""
+		hud.toast("Tileset: %s%s" % [p.name, who])
+		_update_hud()
+		if persist and not (_args.has("autopilot") or _args.has("bench") or _args.has("tileset-check")):
+			var cfg := ConfigFile.new()
+			cfg.load(SETTINGS) # keep other settings; a missing file is fine
+			cfg.set_value("render", "tileset", p.id)
+			cfg.save(SETTINGS)
+	tileset_changed.emit(p.id)
+	return true
+
+
+## Next (step 1) / previous (-1) pack, wrapping; returns the new id ("" when there are no packs).
+func cycle_tileset(step := 1, persist := true) -> String:
+	if tilesets.is_empty():
+		return ""
+	var i := 0
+	for j in tilesets.size():
+		if tilesets[j].id == tileset_id:
+			i = j
+	set_tileset(tilesets[posmod(i + step, tilesets.size())].id, persist)
+	return tileset_id
+
+
+## One dictionary per pack (id, name, platform, credit, licence, url, builtin, dir, cell, mapped, ...).
+func tileset_list() -> Array[Dictionary]:
+	var out: Array[Dictionary] = []
+	for p in tilesets:
+		out.append(p.info())
+	return out
 
 
 func _parse_args(args: PackedStringArray) -> Dictionary:
@@ -146,7 +251,13 @@ func _update_hud() -> void:
 		"hp": st.hp if st else 0, "max_hp": st.max_hp if st else 0, "level": st.level if st else 1,
 		"xp": st.xp if st else 0, "gold": st.gold if st else 0, "kills": st.kills if st else 0,
 		"deaths": st.deaths if st else 0, "map": String(mi.key).capitalize() if mi else "",
-		"renderer": "Tab/F3 " + renderer.describe(), "inventory": inv, "chat": chat})
+		"renderer": "Tab/F3 " + renderer.describe(), "inventory": inv, "chat": chat,
+		"tileset": _tileset_name()})
+
+
+func _tileset_name() -> String:
+	var p := Tilesets.find(tilesets, tileset_id)
+	return p.name if p else ""
 
 
 func _unhandled_input(ev: InputEvent) -> void:
@@ -159,6 +270,8 @@ func _unhandled_input(ev: InputEvent) -> void:
 	match ev.keycode:
 		KEY_TAB, KEY_F3:
 			toggle_renderer()
+		KEY_F4:
+			cycle_tileset(-1 if ev.shift_pressed else 1)
 		KEY_F1:
 			hud.toggle_help()
 		KEY_ENTER, KEY_KP_ENTER:
@@ -298,6 +411,8 @@ func _register_maps() -> void:
 
 
 func _process(_delta: float) -> void:
+	if _args.has("tileset-check"):
+		return
 	if _args.has("bench"):
 		_bench_frame()
 		return
@@ -978,3 +1093,133 @@ func _bench_frame() -> void:
 		print("BENCH chunks built=%d threads=%d res=%s | %s" % [log.size(), OS.get_processor_count(),
 			str(renderer.get("opts")["res"]), " | ".join(parts)])
 	get_tree().quit(0)
+
+
+## UI hook sanity (part of --tileset-check): for screen offsets on both axes the focus tile must project to the
+## offset viewport centre, screen_to_world must invert it, and points around the view must round-trip.
+func _hooks_check(st: MapViewState, fails: Array[String]) -> void:
+	var vp := get_viewport().get_visible_rect().size
+	var tol_px := 3.0
+	# 2D: height 0 is the bottom edge of a sprite drawn at p and 0.5 its centre = the point drawn at p; 3D: 0 = ground.
+	var h0 := 0.5 if renderer is TileRenderer2D else 0.0
+	# 3D: world_to_screen stands walls/doors at floor level (where a sprite on them is drawn) while screen_to_world
+	# hits their top, so one probe landing on a tall tile may miss.
+	var allow := 0 if renderer is TileRenderer2D else 1
+	for off: Vector2 in [Vector2.ZERO, Vector2(200, -120), Vector2(-150, 90)]:
+		renderer.set_screen_offset(off)
+		for _f in 8:
+			renderer.render(st)
+			await get_tree().process_frame
+		var want := vp / 2.0 + off
+		var w := renderer.world_to_screen(st.focus, h0)
+		var back := renderer.screen_to_world(w) if w.is_finite() else Vector2(NAN, NAN)
+		var trips := 0
+		var bad := 0
+		for fx: float in [0.3, 0.5, 0.7]:
+			for fy: float in [0.35, 0.5, 0.65]:
+				var px := Vector2(vp.x * fx, vp.y * fy) + off * 0.5
+				var t := renderer.screen_to_world(px)
+				if not t.is_finite():
+					continue
+				var q := renderer.world_to_screen(t, h0)
+				if not q.is_finite(): # 3D: the point is outside line of sight (tags are hidden there)
+					continue
+				trips += 1
+				if q.distance_to(px) > tol_px:
+					bad += 1
+					print("TILESET_CHECK hooks miss px=%s world=%s back_px=%s" % [px, t, q])
+		var ok := w.is_finite() and w.distance_to(want) <= tol_px and back.is_finite() and back.distance_to(st.focus) < 0.35 \
+			and trips >= 5 and bad <= allow
+		print("TILESET_CHECK hooks renderer=%s offset=%s focus_px=%s want=%s back=%s roundtrip=%d/%d %s" % [
+			renderer_kind, off, w.round(), want, back, trips - bad, trips, "ok" if ok else "BAD"])
+		if not ok:
+			fails.append("UI hooks off at offset %s" % off)
+		if off == Vector2(200, -120) and _args.has("shots") and DisplayServer.get_name() != "headless":
+			get_viewport().get_texture().get_image().save_png(String(_args["shots"]).path_join(
+				"hooks_offset_%s.png" % renderer_kind))
+	renderer.set_screen_offset(Vector2.ZERO)
+
+
+## ---------------------------------------------------------------- --tileset-check (offline, no server)
+## Cycles every pack on map 0 around Game.bench_start in the current renderer: each pack must resolve all 256
+## tiles at its cell size and become the renderers' atlas; the default pack must be the source's own atlas byte for
+## byte; F4-style cycling must visit every pack once and come back; an unknown id must be refused.
+## --shots DIR saves tileset_<id>_<renderer>.png per pack (needs a display; local evidence only, never in git).
+## --tileset-expect a,b: ids that must be present.
+func _tileset_check() -> void:
+	var fails: Array[String] = []
+	_bench = {"start": Game.bench_start(src)}
+	print("TILESET_CHECK start renderer=%s packs=%d source=%s" % [renderer_kind, tilesets.size(), src.source])
+	if tilesets.is_empty():
+		fails.append("no packs (the source has no atlas)")
+	for want in String(_args.get("tileset-expect", "")).split(",", false):
+		if Tilesets.find(tilesets, want) == null:
+			fails.append("expected pack %s missing" % want)
+	var base := src.default_tileset()
+	if base and src.atlas_image():
+		var own := src.atlas_image().duplicate() as Image
+		own.convert(Image.FORMAT_RGBA8)
+		if base.image.get_data() != own.get_data():
+			fails.append("default pack differs from the source's atlas")
+	var first := tileset_id
+	var seen := {}
+	var digests := {}
+	var st := _bench_state(0, 0.0)
+	for i in tilesets.size():
+		var p := Tilesets.find(tilesets, tileset_id)
+		if p == null or seen.has(p.id):
+			fails.append("cycle revisited %s before covering every pack" % tileset_id)
+			break
+		seen[p.id] = true
+		if p.image == null or p.image.get_width() != 16 * p.cell or p.image.get_height() < 16 * p.cell or p.mapped.size() != 256:
+			fails.append("%s: atlas does not hold 256 tiles" % p.id)
+		elif src.view_atlas_image() != p.image and p != base:
+			fails.append("%s: not the renderers' atlas after set_tileset" % p.id)
+		var t0 := Time.get_ticks_msec()
+		while true:
+			renderer.render(st)
+			await get_tree().process_frame
+			if renderer.is_ready() or Time.get_ticks_msec() - t0 > 30000:
+				break
+		for _f in 5:
+			renderer.render(st)
+			await get_tree().process_frame
+		var shot := "-"
+		var img := get_viewport().get_texture().get_image() if DisplayServer.get_name() != "headless" else null
+		if img and _args.has("shots"):
+			DirAccess.make_dir_recursive_absolute(String(_args["shots"]))
+			shot = String(_args["shots"]).path_join("tileset_%s_%s.png" % [p.id, renderer_kind])
+			if img.save_png(shot) != OK:
+				fails.append("%s: cannot save %s" % [p.id, shot])
+		var view := "-"
+		if img:
+			var ctx := HashingContext.new()
+			ctx.start(HashingContext.HASH_SHA256)
+			ctx.update(img.get_data())
+			view = ctx.finish().hex_encode().substr(0, 12)
+		digests[p.id] = view
+		print("TILESET_CHECK pack id=%s platform=%s cell=%d mapped=%d anim=%d atlas=%s view=%s ready=%s shot=%s" % [
+			p.id, p.platform, p.cell, p.mapped_count(), p.anims.size(), p.digest(), view, renderer.is_ready(), shot])
+		cycle_tileset(1, false)
+	if tileset_id != first:
+		fails.append("cycling did not return to %s (at %s)" % [first, tileset_id])
+	if seen.size() != tilesets.size():
+		fails.append("cycle visited %d of %d packs" % [seen.size(), tilesets.size()])
+	if tilesets.size() > 1:
+		var back := cycle_tileset(-1, false)
+		if back != tilesets[-1].id:
+			fails.append("Shift+F4 from the first pack gave %s, expected %s" % [back, tilesets[-1].id])
+		cycle_tileset(1, false)
+	if set_tileset("no-such-pack", false) or tileset_id != first:
+		fails.append("an unknown id was accepted")
+	await _hooks_check(st, fails)
+	if DisplayServer.get_name() != "headless" and tilesets.size() > 1:
+		var uniq := {}
+		for k in digests:
+			uniq[digests[k]] = true
+		if uniq.size() < 2:
+			fails.append("every pack rendered the same frame")
+	for f in fails:
+		print("TILESET_CHECK fail: " + f)
+	print("TILESET_CHECK %s renderer=%s packs=%d" % ["PASS" if fails.is_empty() else "FAIL", renderer_kind, tilesets.size()])
+	get_tree().quit(0 if fails.is_empty() else 1)

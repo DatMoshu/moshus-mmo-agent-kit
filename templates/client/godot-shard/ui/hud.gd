@@ -2,8 +2,15 @@
 ## 2D canvas and the 3D viewport). Shows stats, inventory, chat, the NPC talk panel, short action
 ## messages and the controls help. It never talks to the server: main.gd feeds it with update() and
 ## reacts to its signals.
+## A game swaps in its own HUD with main.set_hud(MyHud.new()) from Game.extend: MyHud extends Hud, overrides every
+## method in FACADE (main calls only these, and listens to the three signals), and skips super._ready() so the
+## default widgets are never built. update(d) receives the keys listed at update() below.
 class_name Hud
 extends CanvasLayer
+
+## The methods main.gd calls on its HUD (a replacement overrides all of them).
+const FACADE := ["is_typing", "open_chat", "close_inputs", "toggle_help", "toast", "show_talk", "end_talk",
+	"talk_text", "update"]
 
 signal chat_submitted(text: String)
 signal talk_submitted(text: String)
@@ -17,7 +24,8 @@ const HELP := """Controls
   T                   talk to the nearest adjacent townsperson
   Enter               chat (Enter sends, Esc cancels)
   Tab / F3            switch 2D / 3D view
-  F4..F12, [ ]       3D view toggles and camera pitch (listed on the status line)
+  F4 / Shift+F4       next / previous tileset (art pack)
+  \\ F5..F12, [ ]     3D view toggles and camera pitch (listed on the status line)
   F1                  show / hide this help
 Walk off a town's edge to leave it; step on a moongate to travel."""
 
@@ -149,11 +157,13 @@ func talk_text() -> String:
 	return _talk_text.text if _talk_panel.visible else ""
 
 
-## d: {name, hp, max_hp, level, xp, gold, kills, deaths, map, renderer, inventory: [[name, qty]], chat: [[name, text, here]]}
+## d: {name, hp, max_hp, level, xp, gold, kills, deaths, map, renderer, tileset, inventory: [[name, qty]],
+##     chat: [[name, text, here]]}
 func update(d: Dictionary) -> void:
-	_status.text = "%s   HP %d/%d   Lv %d   XP %d   Gold %d   Kills %d   Deaths %d\n%s   [%s]   F1 help" % [
+	_status.text = "%s   HP %d/%d   Lv %d   XP %d   Gold %d   Kills %d   Deaths %d\n%s   [%s]   %s   F1 help" % [
 		d.get("name", "?"), d.get("hp", 0), d.get("max_hp", 0), d.get("level", 1), d.get("xp", 0),
-		d.get("gold", 0), d.get("kills", 0), d.get("deaths", 0), d.get("map", ""), d.get("renderer", "")]
+		d.get("gold", 0), d.get("kills", 0), d.get("deaths", 0), d.get("map", ""), d.get("renderer", ""),
+		"F4 " + String(d.get("tileset", "")) if String(d.get("tileset", "")) != "" else ""]
 	var hp_f := float(d.get("hp", 0)) / maxf(1.0, float(d.get("max_hp", 1)))
 	_status.add_theme_color_override("font_color", Color.WHITE if hp_f > 0.3 else Color(1, 0.5, 0.45))
 	var inv := PackedStringArray(["Inventory"])

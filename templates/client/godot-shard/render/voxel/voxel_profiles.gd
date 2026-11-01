@@ -41,6 +41,9 @@ var avatar_tile := 31
 
 var _pixels := PackedByteArray() # 256 tiles * 256 px EGA indices
 var _have_pixels := false
+## True while the pixels come from a tileset pack (voxel colour sampling): a pixel shows its own (EGA-snapped)
+## colour and the table's per-pixel "colour" overrides are ignored (heights, water, glow and canopy rules stay).
+var pack_colours := false
 var _templates := {}
 var _lock := Mutex.new()
 var true_black := false
@@ -156,7 +159,7 @@ func top_color(cat: int, e: int, ega: Array) -> Color:
 	if e == 0:
 		return Color.BLACK if true_black and not water[cat] else ground_col[cat]
 	var rule: Dictionary = _rules[cat][e]
-	if rule.has("colour"):
+	if rule.has("colour") and not pack_colours:
 		return Color(String(rule["colour"]))
 	return ega[e]
 

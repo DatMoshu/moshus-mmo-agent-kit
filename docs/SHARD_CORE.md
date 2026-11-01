@@ -99,7 +99,7 @@ class_name TileSource extends RefCounted
 var root, source, maps, error, player_tile   # diagnostics + map_id -> {w, h, tiles, key}; hero sprite id
 func tile_at(map_id, x, y) -> int       # -1 outside / unknown
 func map_size(map_id) -> Vector2i
-func atlas() -> Texture2D               # 16x16 grid of 16-px tiles, indexed by tile id
+func atlas() -> Texture2D               # 16x16 grid of 16-px tiles, indexed by tile id (the source's own art)
 func atlas_image() -> Image             # the same pixels on the CPU (3D voxelizer, headless)
 func register_map(map_id, key, w, h) -> bool   # called for every server map_info row
 func start_talk(map_id, talk) -> Conversation  # null = nothing to say
@@ -120,6 +120,113 @@ Input remapping (a game's own key scheme, set from `extend(main)`): `main.key_ho
 sees every key press before the core keys (return true to consume it); `main.move_hook: Callable(Vector2i) ->
 Vector2i` rewrites the frame's walking direction; `main.wasd_enabled = false` leaves only the arrows so W/A/S/D
 can be commands; `main.move_dir()` is the resulting direction. Neither hook runs while a HUD text box has focus.
+
+### UI hooks (renderers and HUD)
+
+Every `MapRenderer` (2D `TileRenderer2D`, 3D `VoxelRenderer3D`) offers the same additive hooks for a game's
+own UI layer. None changes what is drawn unless used.
+
+```gdscript
+var external_tags := false          # true: the renderer skips its own name labels / HP bars (the UI draws them)
+var last_state: MapViewState        # the frame's view (focus, entities) after render(); null before the first
+var screen_offset: Vector2          # read-only; set with set_screen_offset()
+func world_to_screen(tile: Vector2, height := 0.0) -> Vector2   # viewport px of a tile-space point; NAN = not visible
+func screen_to_world(screen: Vector2) -> Vector2                # tile-space point under a viewport px; NAN = none
+func set_screen_offset(px: Vector2) -> void   # shift the map's drawn centre by px (e.g. right of a side panel)
+func refresh_atlas() -> void                  # re-read TileSource.view_atlas*() (main calls it on a tileset switch)
+```
+
+* 2D: `world_to_screen` also returns points off the window (callers clip); the visible tile range is
+  computed from the offset viewport, so any offset leaves no undrawn strip.
+* 3D: the offset is applied as camera `h_offset`/`v_offset` (both axes). `world_to_screen(tile, height)` takes
+  the height in tiles above ground and includes the world curvature; it returns NAN behind the camera or outside line of sight.
+  `screen_to_world` ray-marches the curved terrain surface (category heights from the voxel table plus the
+  curvature drop) with a final bisection, so it is exact to the tile on flat categories. **Limit:** per-pixel
+  bevels, bumps and `dh` rules (< 1/4 tile) are ignored, and on the wrapping overworld it returns the copy
+  nearest the camera focus (unwrapped coordinates; wrap with `posmod` if needed).
+
+The HUD is replaceable: `main.set_hud(h: Hud)` (call it from `Game.extend(main)`) frees the default HUD and
+installs `h`, keeps its visibility, reconnects the three signals (`chat_submitted`, `talk_submitted`,
+`talk_closed`) and emits `main.hud_changed(h)`. The replacement `extends Hud`, does **not** call
+`super._ready()` (so the default widgets are never built) and overrides every method in `Hud.FACADE`:
+`is_typing() -> bool`, `open_chat()`, `close_inputs()`, `toggle_help()`, `toast(text, seconds := 2.5)`,
+`show_talk(title, text, focus := true)`, `end_talk()`, `talk_text() -> String`, `update(d: Dictionary)`. `update` receives
+`{name, hp, max_hp, level, xp, gold, kills, deaths, map, renderer, tileset, inventory, chat}` every frame.
+Nothing in the core needs to change for a game's own UI; `client/game/` is the only place it lives.
+
+### Tilesets (switchable art packs)
+
+The server only ever sends tile ids (0-255); art is a client choice. A **tileset pack** replaces the tile art
+in both renderers at run time. Core files: `render/tileset_pack.gd` (`TilesetPack`: manifest validation,
+building), `render/tilesets.gd` (`Tilesets.discover`), `TileSource` (active pack, game-specific packs) and
+`scenes/main.gd` (switching, keys, setting).
+
+**Player side.** F4 / Shift+F4 cycle the packs (a toast shows name and credit; the HUD status line shows the
+active pack). The choice is saved as `render/tileset` in `user://settings.cfg` (load-modify-save, other keys
+kept). `--tileset ID` picks the start pack (overrides the setting); `--tileset-dir DIR` adds a folder of packs
+besides `user://tilesets/` (one sub-folder per pack: `user://tilesets/<id>/tileset.json` + images). Folders
+that fail validation are skipped with one `TILESET skip dir=… <reasons>` line; each loaded pack prints
+`TILESET id=… cell=… mapped=N/256 anim=K`.
+
+**Manifest** (`tileset.json`, schema 1):
+
+```json
+{"schema": 1, "id": "my-pack", "name": "My pack", "platform": "community",
+ "tile_size": [16, 16], "fit": "stretch", "palette": "embedded",
+ "source": {"kind": "pack", "sheets": [{"file": "tiles.png", "columns": 16}]},
+ "mapping": {"kind": "table", "table": {"0-63": 0, "64": [64, 65]}, "fps": 4},
+ "fallback": "default", "voxel_colour": "ega", "credit": "...", "licence": "...", "url": "..."}
+```
+
+* Required: `schema`, `id` (`^[a-z0-9][a-z0-9-]{1,47}$`), `name`, `platform` (`community` or one of the
+  game's `TileSource.tileset_platforms()`), `tile_size` ([w, h], 4-256 px), `source`.
+* `source.kind`: `pack` (sheets cut left-to-right, top-to-bottom; `file` relative, no `..`; `columns` >= 1;
+  several sheets concatenate) or `install` (`extractor`: the game's `TileSource.extract_tileset(extractor, path)`
+  decodes the player's own files at run time).
+* `mapping.kind`: `identity` (raw tile n = tile id n) or `table`: keys are tile ids `"N"` or ranges `"A-B"`,
+  values a raw index (a range maps A+j -> v+j) or a list of raw indices = animation frames (`fps`, default 4;
+  for a range every frame index is offset by j).
+* `fit`: `stretch` (default) or `pad` (centre on black, keeps the aspect, e.g. 14x16 art).
+  `palette`: `embedded` (use the PNG's colours), `ega`, `cga` or a list of hex colours (pixels snap to the
+  nearest).
+* Unmapped tile ids are drawn from the `fallback` pack (default: the game's own art, id from
+  `TileSource.default_tileset_id()`), else a magenta placeholder. `mapped=N/256` reports coverage.
+* The built atlas is 16 columns of `cell` px tiles, `cell = clamp(max(tile_size), 16, 64)`; animation frames
+  are extra rows after tile 255.
+* `voxel_colour`: `ega` (default: the 3D terrain keeps the base art's colours and only sprites/billboards use
+  the pack) or `sample` (the voxel terrain takes the pack's pixels, snapped to the 16-colour table; the voxel
+  table's per-pixel `colour` overrides are then ignored, heights and flags still apply). The 3D option
+  `packcol` forces sampling for every pack, `packsprites=false` keeps base-art sprites.
+
+**Game side** (`TileSource`, all optional):
+
+```gdscript
+func default_tileset_id() -> String          # id of the source's own art ("default"); e.g. "dos-ega"
+func default_tileset_name() -> String        # "Default"
+func default_tileset_meta() -> Dictionary    # {platform, credit, licence, url} of the own art
+func builtin_tilesets() -> Array[TilesetPack] # packs decoded from the player's install (TilesetPack.from_image)
+func extract_tileset(extractor, path) -> Image   # for source.kind = install
+func detect_tileset(dir) -> Dictionary       # a manifest for a folder without tileset.json (community layouts)
+func tileset_platforms() -> PackedStringArray    # accepted platform ids besides "community"
+```
+
+The renderers draw through `view_atlas()`, `view_atlas_image()`, `view_tile_rect(tile)` and `view_cell()`
+(the active pack, animated). `atlas()`, `atlas_image()` and `tile_rect()` stay the source's own art (16 px
+grid): game code and the voxel profile table keep their meaning whatever pack is active.
+
+**API** on main: `set_tileset(id, persist := true) -> bool` (false for an unknown id), `cycle_tileset(step := 1,
+persist := true) -> String`, `tileset_list() -> Array[Dictionary]` (`{id, name, platform, credit, licence, url,
+builtin, dir, cell, mapped, animated, voxel_colour}`), `tileset_id`, signal `tileset_changed(id)`. The setting is never saved
+in `--autopilot`, `--bench` or `--tileset-check` runs.
+
+**Check.** `python tools/shard/tileset_check.py --project CLIENT [--renderer 2d|3d|both] [--shots DIR] -- <source
+flags>` writes synthetic packs (generated coloured squares, safe to share: 16 px identity, 32 px table with an
+animation and fallback, 14x16 pad with EGA snapping, plus two folders that must be refused) and runs the
+client offline with `--tileset-check --tileset-dir DIR --tileset-expect IDS`: every pack must build a 256-tile
+atlas, become the renderers' atlas, render, and F4 / Shift+F4 must cycle all packs in order and wrap; with a
+display each pack's frame must differ. The same run checks the UI hooks: for screen offsets (0,0), (200,-120)
+and (-150,90) the focus must project to the offset centre and `screen_to_world` must invert `world_to_screen`
+(2D at height 0.5, the point drawn at p; 3D at height 0, skipping points out of line of sight). `tileset_check.py write DIR` only writes the packs.
 
 ## 3. Rules for an adapter whose data is commercial
 

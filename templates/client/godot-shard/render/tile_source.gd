@@ -12,6 +12,8 @@ var source := "" # kind of data found ("install", "fixture", "doc", ...); "" = n
 var maps := {}   # map_id -> {"w": int, "h": int, "tiles": PackedByteArray, "key": String}
 var error := ""  # why loading failed
 var player_tile := 31 # tile id drawn for players (the game's hero sprite)
+var tileset: TilesetPack # the art renderers draw (null = this source's own atlas()); main.set_tileset() sets it
+var _default_pack: TilesetPack
 
 ## Per-tile-id walk flags (1 = walkable) when the adapter ships them; empty = use the renderer's profile table.
 func walk_table() -> PackedByteArray:
@@ -41,6 +43,73 @@ func atlas_image() -> Image:
 
 func tile_rect(tile: int) -> Rect2:
 	return Rect2((tile % 16) * TILE_PX, (tile / 16) * TILE_PX, TILE_PX, TILE_PX)
+
+## ---------------------------------------------------------------- tilesets (docs/SHARD_CORE.md "Tilesets")
+## atlas() / atlas_image() / tile_rect() stay this source's own art (the default pack, and the voxel colours unless
+## a pack asks to be sampled). Renderers draw through the view_* calls, which follow the active pack.
+
+func set_tileset(pack: TilesetPack) -> void:
+	tileset = pack
+
+
+func view_atlas() -> Texture2D:
+	return tileset.texture if tileset and tileset.texture else atlas()
+
+
+func view_atlas_image() -> Image:
+	return tileset.image if tileset and tileset.image else atlas_image()
+
+
+## Source rect of tile id `tile` in view_atlas() (animated packs advance with the clock).
+func view_tile_rect(tile: int) -> Rect2:
+	return tileset.rect(tile, Time.get_ticks_msec()) if tileset and tileset.image else tile_rect(tile)
+
+
+## Pixel size of one tile in view_atlas().
+func view_cell() -> int:
+	return tileset.cell if tileset and tileset.image else TILE_PX
+
+
+## The default pack: this source's own atlas under the game's id/name for it. Built once.
+func default_tileset() -> TilesetPack:
+	if _default_pack == null and atlas_image() != null:
+		_default_pack = TilesetPack.from_image(default_tileset_id(), default_tileset_name(), atlas_image(),
+			default_tileset_meta())
+	return _default_pack
+
+
+func default_tileset_id() -> String:
+	return "default"
+
+
+func default_tileset_name() -> String:
+	return "Default"
+
+
+## platform / credit / licence shown for the default pack.
+func default_tileset_meta() -> Dictionary:
+	return {}
+
+
+## Other packs the game builds from the player's data (e.g. another platform's art in the same install).
+func builtin_tilesets() -> Array[TilesetPack]:
+	return []
+
+
+## A manifest's source {"kind": "install", "extractor": E, "path": P}: a 16-column sheet of the 256 tiles at
+## the manifest's tile_size, read from the player's own install. null = this game has no such extractor / no data.
+func extract_tileset(_extractor: String, _path: String) -> Image:
+	return null
+
+
+## A manifest for a pack folder without tileset.json (a community layout the game recognises); {} = unknown.
+func detect_tileset(_dir: String) -> Dictionary:
+	return {}
+
+
+## Allowed manifest "platform" ids (empty = any lowercase slug).
+func tileset_platforms() -> PackedStringArray:
+	return PackedStringArray()
 
 ## The server announces each map as (map_id, key, size) in `map_info`; load that map's tiles from local data.
 ## Returns false when this source has no data for `key` (renderers then draw placeholders).

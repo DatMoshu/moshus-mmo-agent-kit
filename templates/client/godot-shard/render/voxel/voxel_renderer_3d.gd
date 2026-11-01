@@ -5,7 +5,7 @@
 ## Players and NPCs are camera-facing billboards (2-frame animation where the tile list has pairs).
 ## Reads only MapViewState + TileSource, like every MapRenderer; it never touches networking or game state.
 ##
-## Keys while active: F4 grid, F5 tilt-shift, F6 curvature, F7 AO, F8 line of sight, F9 true EGA black,
+## Keys while active: backslash grid, F5 tilt-shift, F6 curvature, F7 AO, F8 line of sight, F9 true EGA black,
 ## F10 variation, F11 shore foam, F12 haze + town base, [ and ] camera pitch (35-50 deg).
 ## Options can also be preset with configure() / --voxel k=v,... (see OPTION_DEFAULTS):
 ##   vary   deterministic height/colour variation (amounts in the voxel table)
@@ -16,6 +16,10 @@
 ##   base   towns stand on a plinth on a tabletop instead of floating in the void
 ##   clamp  in towns the camera stops at the map edge (the overworld wraps, so never clamped there)
 ##   curve_k curvature strength, dof tilt-shift blur radius (px)
+##   packsprites  billboards use the active tileset pack (on; off = always the default art)
+##   packcol      voxel terrain colours are sampled from the active pack (off = the default art's colours, unless
+##                the pack's manifest says voxel_colour "sample"); colours snap to the 16-colour voxel table
+## (F4 is the core's tileset key: main.gd cycles packs; the grid toggle moved to backslash.)
 class_name VoxelRenderer3D
 extends MapRenderer
 
@@ -33,7 +37,7 @@ const TAG_FADE := Vector2(10.0, 17.0) # name tags fade out between these distanc
 # (~15-28 ms on an RTX 4090) breaks the 60 fps budget on a chunk crossing; res 16 (one voxel per pixel) stays available via --voxel res=16.
 const OPTION_DEFAULTS := {"grid": false, "tilt": true, "curve": true, "ao": true, "los": true, "black": false,
 	"pitch": 42.0, "res": 8, "distance": 26.0, "vary": true, "bevel": true, "foam": true, "tags": true, "fog": true,
-	"base": true, "clamp": true, "curve_k": CURVE_K, "dof": 14.0}
+	"base": true, "clamp": true, "curve_k": CURVE_K, "dof": 14.0, "packsprites": true, "packcol": false}
 
 var opts := OPTION_DEFAULTS.duplicate()
 var prof := VoxelProfiles.new()
@@ -66,6 +70,9 @@ var _base_mat := ShaderMaterial.new()
 var _plinth_mat: ShaderMaterial
 var _base_map := -1
 var _cam_snap := false
+var _sprite_cell := TileSource.TILE_PX
+var _pix_id := ""   # id of the pack the voxel colours were sampled from ("" = the source's own atlas)
+var _pix_ver := 0   # bumps when the voxel colours change (part of the chunk key, so caches rebuild)
 var build_log: Array = [] # {key, ms_assemble, ms_mesh, ms_upload, verts}
 
 
@@ -110,17 +117,48 @@ func attach(source: TileSource) -> void:
 	super.attach(source)
 	var vt: Dictionary = source.voxel_table() if source else {}
 	_ok = prof.load_dict(vt) if not vt.is_empty() else prof.load_table(TABLE)
-	var img := source.atlas_image() if source else null
-	if _ok:
-		prof.set_pixels(img, Palette.EGA)
+	_pix_id = "?"
+	refresh_atlas()
+
+
+## Billboards from the active pack (black keyed out unless the pack has its own transparency); voxel colours
+## from the default art, or from the pack when it asks for sampling (packcol / voxel_colour "sample").
+func refresh_atlas() -> void:
+	if tiles == null:
+		return
+	var pack := tiles.tileset
+	var sample := pack != null and pack.image != null and (bool(opts["packcol"]) or pack.voxel_colour == "sample")
+	var want := pack.id if sample else ""
+	if _ok and want != _pix_id:
+		for k in _pending:
+			WorkerThreadPool.wait_for_task_completion(_pending[k]["task"])
+		_pending.clear()
+		prof.set_pixels(pack.image_16() if sample else tiles.atlas_image(), Palette.EGA)
+		prof.pack_colours = sample
 		_pal_tex = ImageTexture.create_from_image(_palette_image())
+		_mat.set_shader_parameter("pal_tex", _pal_tex)
+		for k in _instances:
+			_instances[k].queue_free()
+		_instances.clear()
+		_cache.clear()
+		_pix_id = want
+		_pix_ver += 1
+	var img := tiles.view_atlas_image() if bool(opts["packsprites"]) else tiles.atlas_image()
+	_sprite_cell = tiles.view_cell() if bool(opts["packsprites"]) else TileSource.TILE_PX
 	if img:
 		var s := img.duplicate() as Image
-		for y in s.get_height():
-			for x in s.get_width():
-				if s.get_pixel(x, y).to_rgba32() == 0x000000ff:
-					s.set_pixel(x, y, Color(0, 0, 0, 0))
+		if s.get_format() != Image.FORMAT_RGBA8:
+			s.convert(Image.FORMAT_RGBA8)
+		if not s.detect_alpha(): # opaque art: black is the sprite background
+			for y in s.get_height():
+				for x in s.get_width():
+					if s.get_pixel(x, y).to_rgba32() == 0x000000ff:
+						s.set_pixel(x, y, Color(0, 0, 0, 0))
 		_sprite_tex = ImageTexture.create_from_image(s)
+		for sp in _sprites:
+			sp.texture = _sprite_tex
+			sp.pixel_size = 1.0 / _sprite_cell
+			sp.offset = Vector2(0, _sprite_cell / 2.0)
 
 
 ## Category x EGA colour table for the shader: rgb = colour (black pixels recoloured per category), a = pixel
@@ -180,10 +218,12 @@ func configure(o: Dictionary) -> void:
 		opts["res"] = 8
 	if is_inside_tree():
 		_apply_opts()
+	if tiles != null and (o.has("packsprites") or o.has("packcol")):
+		refresh_atlas()
 
 
 func describe() -> String:
-	return ("3D voxel  F4 grid:%s F5 tilt:%s F6 curve:%s F7 ao:%s F8 los:%s F9 black:%s F10 vary:%s F11 foam:%s "
+	return ("3D voxel  \\ grid:%s F5 tilt:%s F6 curve:%s F7 ao:%s F8 los:%s F9 black:%s F10 vary:%s F11 foam:%s "
 		+ "F12 haze:%s  [ ] pitch %d  res %d") % [
 		_on(opts["grid"]), _on(opts["tilt"]), _on(opts["curve"]), _on(opts["ao"]), _on(opts["los"]), _on(opts["black"]),
 		_on(opts["vary"]), _on(opts["foam"]), _on(opts["fog"]), int(opts["pitch"]), int(opts["res"])]
@@ -211,7 +251,7 @@ func _apply_opts() -> void:
 func _unhandled_input(ev: InputEvent) -> void:
 	if not (ev is InputEventKey and ev.pressed and not ev.echo):
 		return
-	var flip := {KEY_F4: "grid", KEY_F5: "tilt", KEY_F6: "curve", KEY_F7: "ao", KEY_F8: "los", KEY_F9: "black",
+	var flip := {KEY_BACKSLASH: "grid", KEY_F5: "tilt", KEY_F6: "curve", KEY_F7: "ao", KEY_F8: "los", KEY_F9: "black",
 		KEY_F10: "vary", KEY_F11: "foam", KEY_F12: "fog"}
 	if flip.has(ev.keycode):
 		opts[flip[ev.keycode]] = not opts[flip[ev.keycode]]
@@ -235,6 +275,7 @@ func _exit_tree() -> void:
 func render(state: MapViewState) -> void:
 	if not _active or not _ok or tiles == null:
 		return
+	last_state = state
 	if state.map_id != _map:
 		_map = state.map_id
 		for k in _instances:
@@ -257,7 +298,7 @@ func render(state: MapViewState) -> void:
 
 ## Build-affecting options (res, variation, bevels) are part of the key, so toggling them rebuilds.
 func _chunk_key(wx: int, wz: int) -> String:
-	return "%d:%d:%d:%d:%d%d" % [_map, wx, wz, int(opts["res"]), int(opts["vary"]), int(opts["bevel"])]
+	return "%d:%d:%d:%d:%d%d:%d" % [_map, wx, wz, int(opts["res"]), int(opts["vary"]), int(opts["bevel"]), _pix_ver]
 
 
 func _update_chunks(size: Vector2i, wrap: bool) -> void:
@@ -431,6 +472,18 @@ func _place_camera() -> void:
 	var dist := float(opts["distance"])
 	_cam.position = _cam_target + Vector3(0, sin(p) * dist, cos(p) * dist)
 	_cam.look_at(_cam_target, Vector3.UP)
+	# UI hook (screen_offset): lens shift so the target sits screen_offset px from the viewport centre. The shift
+	# is parallel to the image plane, so it is exact for the target's depth (world units per px there below).
+	var vh := get_viewport().get_visible_rect().size.y if is_inside_tree() else 0.0
+	var upp := 0.0 if vh <= 0.0 else 2.0 * dist * tan(deg_to_rad(_cam.fov) / 2.0) / vh
+	_cam.h_offset = -screen_offset.x * upp
+	_cam.v_offset = screen_offset.y * upp
+
+
+func set_screen_offset(px: Vector2) -> void:
+	screen_offset = px
+	if _active and _ok and _map >= 0 and _cam.is_inside_tree():
+		_place_camera()
 
 
 ## Keep a town's ground footprint (viewport corners cast onto the ground plane) inside the map, so the camera
@@ -495,6 +548,80 @@ func _update_los(state: MapViewState, wrap: bool) -> void:
 	_param("los_size", float(side))
 
 
+## UI hook: same placement maths as _update_sprites (overworld wrap, ground height, world curve).
+func world_to_screen(tile: Vector2, height := 0.0) -> Vector2:
+	if not _active or not _ok or tiles == null or _map < 0 or not _cam.is_inside_tree():
+		return Vector2(NAN, NAN)
+	var size := tiles.map_size(_map)
+	if size == Vector2i.ZERO:
+		return Vector2(NAN, NAN)
+	var pos := tile
+	if _map == 0:
+		pos.x = _focus.x + wrapf(pos.x - _focus.x, -size.x / 2.0, size.x / 2.0)
+		pos.y = _focus.y + wrapf(pos.y - _focus.y, -size.y / 2.0, size.y / 2.0)
+	if pos.distance_to(_focus) > 0.75 and not los_visible(pos):
+		return Vector2(NAN, NAN)
+	var k := float(opts["curve_k"]) if opts["curve"] else 0.0
+	var tt := tiles.tile_at(_map, posmod(int(floor(pos.x)), size.x), posmod(int(floor(pos.y)), size.y))
+	var d := Vector2(pos.x - _cam_target.x, pos.y - _cam_target.z)
+	var w := Vector3(pos.x, _ground_y(tt) - d.length_squared() * k + height, pos.y)
+	if _cam.is_position_behind(w):
+		return Vector2(NAN, NAN)
+	return _cam.unproject_position(w)
+
+
+## UI hook: the ground point under a viewport pixel. Marches the view ray against the drawn surface: each tile's
+## top height (its voxel category base; voxel bevels and per-pixel bumps are ignored, < 1/4 tile) bent down by the
+## world curve around the camera target, then refines the crossing by bisection. On the wrapping overworld the
+## result is the copy nearest the focus (may lie outside 0..size; posmod it). NAN when the ray meets no ground
+## within the camera's far plane.
+func screen_to_world(screen: Vector2) -> Vector2:
+	if not _active or not _ok or tiles == null or _map < 0 or not _cam.is_inside_tree():
+		return Vector2(NAN, NAN)
+	var o := _cam.project_ray_origin(screen)
+	var dir := _cam.project_ray_normal(screen)
+	if dir.y >= -0.001 and float(opts["curve_k"]) <= 0.0:
+		return Vector2(NAN, NAN)
+	var step := 0.25 / maxf(0.05, Vector2(dir.x, dir.z).length() + absf(dir.y))
+	var prev := 0.0
+	var t := step
+	var far := _cam.far
+	while t < far:
+		var p := o + dir * t
+		if p.y <= surface_y(Vector2(p.x, p.z)):
+			var a := prev
+			var b := t
+			for _i in 10:
+				var m := (a + b) / 2.0
+				var q := o + dir * m
+				if q.y <= surface_y(Vector2(q.x, q.z)):
+					b = m
+				else:
+					a = m
+			var hit := o + dir * b
+			return Vector2(hit.x, hit.z)
+		prev = t
+		t += step
+	return Vector2(NAN, NAN)
+
+
+## Height of the drawn ground at a tile-space point (tile top height minus the world curve; 0 off a town's map).
+func surface_y(p: Vector2) -> float:
+	var size := tiles.map_size(_map)
+	var tx := int(floor(p.x))
+	var ty := int(floor(p.y))
+	var top := 0.0
+	if _map == 0:
+		tx = posmod(tx, maxi(1, size.x))
+		ty = posmod(ty, maxi(1, size.y))
+	if tx >= 0 and ty >= 0 and tx < size.x and ty < size.y:
+		var tt := tiles.tile_at(_map, tx, ty)
+		if tt >= 0:
+			top = prof.base[prof.cat_of_tile[tt]] / 16.0
+	var k := float(opts["curve_k"]) if opts["curve"] else 0.0
+	return top - Vector2(p.x - _cam_target.x, p.y - _cam_target.z).length_squared() * k
+
+
 func los_visible(p: Vector2) -> bool:
 	if not opts["los"]:
 		return true
@@ -518,13 +645,13 @@ func _sprite(i: int) -> Sprite3D:
 	while _sprites.size() <= i:
 		var s := Sprite3D.new()
 		s.billboard = BaseMaterial3D.BILLBOARD_FIXED_Y
-		s.pixel_size = 1.0 / 16.0
+		s.pixel_size = 1.0 / _sprite_cell
 		s.texture_filter = BaseMaterial3D.TEXTURE_FILTER_NEAREST
 		s.alpha_cut = SpriteBase3D.ALPHA_CUT_DISCARD
 		s.shaded = false
 		s.region_enabled = true
 		s.texture = _sprite_tex
-		s.offset = Vector2(0, 8)
+		s.offset = Vector2(0, _sprite_cell / 2.0)
 		var l := Label3D.new()
 		l.billboard = BaseMaterial3D.BILLBOARD_ENABLED
 		l.pixel_size = 0.0045
@@ -575,10 +702,10 @@ func _update_sprites(state: MapViewState, size: Vector2i, wrap: bool) -> void:
 		s.position = Vector3(pos.x, _ground_y(tt) - d.length_squared() * k + bob, pos.y)
 		s.scale = Vector3.ONE * float(it[6])
 		var tile := _frame_tile(int(it[1]))
-		s.region_rect = Rect2((tile % 16) * 16, (tile / 16) * 16, 16, 16)
+		s.region_rect = tiles.view_tile_rect(tile) if bool(opts["packsprites"]) else tiles.tile_rect(tile)
 		s.texture = _sprite_tex
 		l.text = it[2]
-		l.visible = it[2] != ""
+		l.visible = it[2] != "" and not external_tags
 		l.modulate = it[5]
 		l.outline_modulate = Color.BLACK
 		l.position = Vector3(0, 1.35, 0)
