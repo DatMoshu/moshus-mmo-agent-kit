@@ -19,7 +19,7 @@ minutes, then grow the same design toward thousands of players.
 | `rules/` | Non-negotiables and the hallucinated-API catalog used by `kit.py check` |
 | `docs/` | Decision tree, scale ladder (10 to 5,000 players), processes, verification log, licensing guide (not legal advice) |
 | `templates/server/rust-single` | A running Rust world module: admission, players, 20 Hz movement tick, AOI cells, health and degradation levels |
-| `templates/client/godot` | A Godot 4.6 client on the MIT flametime SDK behind a small `Net` seam, with a headless autopilot test |
+| `templates/client/godot` | A Godot 4.7 client on the MIT flametime SDK behind a small `Net` seam, with a headless autopilot test |
 | `templates/server/ts-single` | The same world in TypeScript, wire-compatible with every client (verified) |
 | `templates/server/rust-sharded` | Global and region databases with 2.14 cross-database outbox handoff, plus `dev_up.py` (verified locally) |
 | `templates/sidecar` | A Node helper process: world census, health-guard pattern, and a place for NPC/outbox work (verified) |
@@ -35,7 +35,7 @@ minutes, then grow the same design toward thousands of players.
 ## 30-minute quickstart: two players moving
 
 You need **SpacetimeDB 2.14.0**, **Rust 1.97.1** with the `wasm32-unknown-unknown` target,
-**Node 22+**, and **Python 3.11+**. Godot 4.6.3 is optional (for step 6).
+**Node 22+**, and **Python 3.11+**. Godot 4.7 is optional (for step 6).
 
 **1. Install the toolchain (about 10 minutes, once).**
 
@@ -83,7 +83,7 @@ the other move. This uses the real SDK, the real subscriptions, and the real tic
 GODOT=/path/to/godot python tools/kit.py smoke --godot   # two headless Godot clients
 ```
 
-To play by hand, open `templates/client/godot` in Godot 4.6.3 and run it twice
+To play by hand, open `templates/client/godot` in Godot 4.7 and run it twice
 (Debug > Customize Run Instances > 2). Move with WASD or the arrow keys.
 
 **7. Load it.**

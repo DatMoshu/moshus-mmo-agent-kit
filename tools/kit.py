@@ -19,7 +19,7 @@ Stdlib only (Python 3.11+). Reads versions from stdb.lock. Every command prints 
 Environment:
   SPACETIME       path to the spacetime CLI (default: `spacetime` on PATH)
   SPACETIME_ARGS  extra global CLI args, e.g. "--root-dir .kit/root --config-path .kit/cli.toml"
-  GODOT           path to a Godot 4.6.x binary (console build on Windows)
+  GODOT           path to a Godot 4.7.x binary (console build on Windows)
   KIT_WASM        prebuilt module .wasm to publish/generate from instead of building
   KIT_RETRIES     retries for transient failures (default 2; 0 disables)
   KIT_RETRY_BASE  first backoff delay in seconds (default 2; doubles each retry, with jitter)

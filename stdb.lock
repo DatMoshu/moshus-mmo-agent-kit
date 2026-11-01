@@ -14,7 +14,7 @@ rust = "1.97.1"               # the toolchain this kit builds and tests with; pi
 rust_target = "wasm32-unknown-unknown"
 node = ">=22"
 python = ">=3.11"             # tools use tomllib
-godot = "4.6.3"
+godot = "4.7"
 
 [godot_sdk]
 name = "flametime/Godot-SpacetimeDB-SDK"
@@ -36,5 +36,5 @@ module = "templates/server/rust-single"
 
 # What was actually exercised, where, and how (see docs/VERIFICATION.md for the full log).
 [tested]
-"linux-x86_64" = "spacetimedb 2.14.0 standalone + CLI, rust 1.97.1 wasm32, node 24, godot 4.6.3 headless; 2026-10-30"
-"windows-x86_64" = "runtime verified (spacetimedb 2.14.0, node 22, godot 4.6.3; prebuilt wasm via KIT_WASM). Rust build unverified without MSVC Build Tools; see docs/VERIFICATION.md; 2026-10-30"
+"linux-x86_64" = "spacetimedb 2.14.0 standalone + CLI, rust 1.97.1 wasm32, node 24, godot 4.6.3 headless; 2026-10-30; godot 4.7.2 headless import + smoke --godot; 2026-11-01"
+"windows-x86_64" = "runtime verified (spacetimedb 2.14.0, node 22, godot 4.6.3; godot 4.7.2 headless import + doctor 2026-11-01, Godot smoke not re-run; prebuilt wasm via KIT_WASM). Rust build unverified without MSVC Build Tools; see docs/VERIFICATION.md; 2026-10-30"

@@ -1,6 +1,6 @@
 ---
 name: stdb-godot-client
-description: Build a Godot 4.6 client for a SpacetimeDB world with the community flametime GDScript SDK (net facade, AOI subscriptions, identity profiles, headless smoke tests). Use for any Godot client work.
+description: Build a Godot 4.7 client for a SpacetimeDB world with the community flametime GDScript SDK (net facade, AOI subscriptions, identity profiles, headless smoke tests). Use for any Godot client work.
 ---
 
 # Godot client
@@ -40,7 +40,7 @@ The reference is `templates/client/godot`, which is verified headless (`python t
 python tools/kit.py smoke --godot      # two headless Godot clients see each other move
 ```
 
-Set `GODOT` to the Godot 4.6.3 binary (console build on Windows).
+Set `GODOT` to the Godot 4.7 binary (console build on Windows).
 
 ## Gotchas
 

@@ -1,6 +1,6 @@
 ---
 name: client-engineer-godot
-description: "Integrates Godot 4.6 clients with SpacetimeDB through the vendored GDScript SDK and a single Net seam. Use for anything under a Godot client."
+description: "Integrates Godot 4.7 clients with SpacetimeDB through the vendored GDScript SDK and a single Net seam. Use for anything under a Godot client."
 model: sonnet
 tools: Read, Grep, Glob, Edit, Write, Bash
 ---

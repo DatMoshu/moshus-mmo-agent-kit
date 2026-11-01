@@ -1,6 +1,6 @@
-# Godot 4.6 client starter
+# Godot 4.7 client starter
 
-**Status: VERIFIED headless.** Two Godot 4.6.3 instances joined a SpacetimeDB 2.14.0 server
+**Status: VERIFIED headless.** Two Godot 4.7.2 instances (and earlier 4.6.3) joined a SpacetimeDB 2.14.0 server
 and each saw the other move (`python tools/kit.py smoke --godot`). It uses the vendored
 [flametime Godot SpacetimeDB SDK](https://github.com/flametime/Godot-SpacetimeDB-SDK)
 (MIT, plugin 0.3.2) in `addons/SpacetimeDB/`.
@@ -33,7 +33,7 @@ and each saw the other move (`python tools/kit.py smoke --godot`). It uses the v
 
 ## Run
 
-Open the folder in Godot 4.6.3 and press Play twice (Debug > Customize Run Instances).
+Open the folder in Godot 4.7 and press Play twice (Debug > Customize Run Instances).
 Headless:
 
 ```bash

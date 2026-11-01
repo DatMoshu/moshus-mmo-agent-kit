@@ -7,7 +7,7 @@ Role definitions usable as Claude Code subagents (`python tools/kit.py install-c
 | [stdb-architect](stdb-architect.md) | opus | Owns topology, schema shape and the scale plan for a SpacetimeDB MMO |
 | [module-engineer](module-engineer.md) | sonnet | Writes and changes SpacetimeDB 2.14 module code (Rust first, TypeScript second): tables, reducers, scheduled jobs, views, procedures |
 | [netcode-engineer](netcode-engineer.md) | sonnet | Owns interest management, subscription design, update rates, quantization and client prediction for SpacetimeDB worlds |
-| [client-engineer-godot](client-engineer-godot.md) | sonnet | Integrates Godot 4.6 clients with SpacetimeDB through the vendored GDScript SDK and a single Net seam |
+| [client-engineer-godot](client-engineer-godot.md) | sonnet | Integrates Godot 4.7 clients with SpacetimeDB through the vendored GDScript SDK and a single Net seam |
 | [client-engineer-unity](client-engineer-unity.md) | sonnet | Integrates Unity clients with SpacetimeDB through the official C# SDK |
 | [client-engineer-unreal](client-engineer-unreal.md) | sonnet | Integrates Unreal Engine clients with SpacetimeDB through the official Unreal SDK (C++ and Blueprint) |
 | [client-engineer-web](client-engineer-web.md) | sonnet | Builds TypeScript/React web clients, admin panels and bot clients on the spacetimedb npm SDK |

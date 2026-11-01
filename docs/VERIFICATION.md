@@ -188,3 +188,19 @@ reports and are labelled that way in `kb/` and `skills/stdb-migration`.
 | `retry` helper | Retried a transient error until it succeeded. A non-transient error and an HTTP 404 were not retried. |
 
 **Not run:** these runner changes on Windows.
+
+## 2026-11-01: Godot pin bumped to 4.7 (Linux, local 2.14.0)
+
+The kit now pins Godot 4.7 (`stdb.lock` `godot = "4.7"`, `config/features` `"4.7"`). `doctor` accepts any
+4.7.x build. The earlier 4.6.3 rows above stay as the historical record.
+
+| Check | Command | Result |
+|---|---|---|
+| Headless import, Godot 4.7.2-stable | `godot --headless --path templates/client/godot --import` | **PASS**: no errors, no project or resource files rewritten |
+| Toolchain doctor | `python tools/kit.py doctor` | `OK godot 4.7.2.stable` |
+| Two-player smoke (Godot 4.7.2 + flametime SDK 0.3.2) | `python tools/kit.py smoke --godot` | **PASS**: both autopilots saw the other move |
+
+On Windows 11, the Godot 4.7.2 console build also passed the headless import and `doctor`.
+Not yet re-run with 4.7: the Windows Godot smoke (no local SpacetimeDB server on that run), `bindings --check` (GDScript codegen), and opening the
+project in the 4.7 editor. The flametime SDK states support for Godot 4.6.1+; 4.7 is not named upstream,
+so treat SDK compatibility as verified only by the smoke above.
