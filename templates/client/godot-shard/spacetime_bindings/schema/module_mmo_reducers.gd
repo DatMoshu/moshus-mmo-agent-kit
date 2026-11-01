@@ -88,6 +88,15 @@ func seed_map_exit(map_id: int, to_map: int, x: int, y: int) -> SpacetimeDBReduc
 	return _client.call_reducer('seed_map_exit', [map_id, to_map, x, y], [&'U8', &'U8', &'U16', &'U16'])
 
 ## 0. kind: int [br]
+## 1. flee_hp_pct: int [br]
+## 2. range: int [br]
+## 3. keep_dist: int [br]
+## 4. pack: int [br]
+## 5. flags: int [br]
+func seed_monster_ai(kind: int, flee_hp_pct: int, range: int, keep_dist: int, pack: int, flags: int) -> SpacetimeDBReducerCall:
+	return _client.call_reducer('seed_monster_ai', [kind, flee_hp_pct, range, keep_dist, pack, flags], [&'U8', &'U8', &'U8', &'U8', &'U8', &'U32'])
+
+## 0. kind: int [br]
 ## 1. name: String [br]
 ## 2. tile: int [br]
 ## 3. hp: int [br]

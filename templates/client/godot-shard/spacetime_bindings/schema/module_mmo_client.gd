@@ -14,6 +14,7 @@ const MapExit = Types.MapExit
 const MapInfo = Types.MapInfo
 const Monster = Types.Monster
 const MonsterKind = Types.MonsterKind
+const MonsterStatus = Types.MonsterStatus
 const Npc = Types.Npc
 const NpcMeta = Types.NpcMeta
 const Player = Types.Player

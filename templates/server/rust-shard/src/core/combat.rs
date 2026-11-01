@@ -1,8 +1,10 @@
-//! Simple PvE: monsters spawn near players outside safe zones, chase and hit adjacent players;
+//! Simple PvE: monsters spawn near players outside safe zones and act on their kind's behaviour
+//! (core/ai.rs: melee, ranged with kept distance, fleeing when hurt, packs, timed statuses);
 //! players `attack` an adjacent monster. Death respawns you at the nearest respawn point.
 
 use spacetimedb::{reducer, Identity, ReducerContext, Table};
 
+use super::ai::*;
 use super::items::drop_item;
 use super::maps::*;
 use super::movement::place;
@@ -43,6 +45,102 @@ fn insert_monster(ctx: &ReducerContext, map_id: u8, tx: i32, ty: i32, k: &Monste
 fn remove_monster(ctx: &ReducerContext, id: u64) {
     ctx.db.monster().id().delete(id);
     ctx.db.monster_brain().id().delete(id);
+    ctx.db.monster_status().id().delete(id);
+}
+
+/// The behaviour row of `kind` (defaults: melee brute).
+pub fn behaviour_of(ctx: &ReducerContext, kind: u8) -> Behaviour {
+    ctx.db
+        .monster_ai()
+        .kind()
+        .find(kind)
+        .map(|a| Behaviour { flee_hp_pct: a.flee_hp_pct, range: a.range, keep_dist: a.keep_dist, pack: a.pack, flags: a.flags })
+        .unwrap_or_default()
+}
+
+fn status_row(ctx: &ReducerContext, id: u64) -> MonsterStatus {
+    ctx.db.monster_status().id().find(id).unwrap_or(MonsterStatus {
+        id,
+        sleep_until: 0,
+        confuse_until: 0,
+        silence_until: 0,
+        fear_until: 0,
+        alert: None,
+        alert_until: 0,
+    })
+}
+
+fn put_status(ctx: &ReducerContext, row: MonsterStatus) {
+    if ctx.db.monster_status().id().find(row.id).is_some() {
+        ctx.db.monster_status().id().update(row);
+    } else {
+        ctx.db.monster_status().insert(row);
+    }
+}
+
+/// Put status `which` (ai::STATUS_*) on monster `id` for `ticks` ticks (0 clears it).
+/// Games use this for spells: sleep, confusion (fights its own kind), silence (no ranged), fear.
+pub fn set_status(ctx: &ReducerContext, id: u64, which: u8, ticks: u64) -> Result<(), String> {
+    ctx.db.monster().id().find(id).ok_or("no such monster")?;
+    let until = if ticks == 0 { 0 } else { current_tick(ctx) + ticks };
+    let mut r = status_row(ctx, id);
+    match which {
+        STATUS_SLEEP => r.sleep_until = until,
+        STATUS_CONFUSE => r.confuse_until = until,
+        STATUS_SILENCE => r.silence_until = until,
+        STATUS_FEAR => r.fear_until = until,
+        _ => return Err("unknown status".into()),
+    }
+    put_status(ctx, r);
+    Ok(())
+}
+
+/// End every timed status on monster `id` (a dispel). The pack alert is kept.
+pub fn clear_statuses(ctx: &ReducerContext, id: u64) {
+    if let Some(r) = ctx.db.monster_status().id().find(id) {
+        ctx.db.monster_status().id().update(MonsterStatus { sleep_until: 0, confuse_until: 0, silence_until: 0, fear_until: 0, ..r });
+    }
+}
+
+/// Call the pack of monster `id` (same kind, within its kind's pack radius) onto player `who`.
+fn alert_pack(ctx: &ReducerContext, mon: &Monster, b: &Behaviour, who: Identity, tick: u64) {
+    if b.pack == 0 {
+        return;
+    }
+    let here = tile_of(mon.x, mon.y);
+    let kin: Vec<u64> = ctx
+        .db
+        .monster()
+        .map_id()
+        .filter(mon.map_id)
+        .filter(|o| o.id != mon.id && o.kind == mon.kind && tile_dist(here, tile_of(o.x, o.y)) <= b.pack as i32)
+        .map(|o| o.id)
+        .collect();
+    for id in kin {
+        let r = status_row(ctx, id);
+        if r.alert != Some(who) || r.alert_until < tick + TICK_HZ as u64 {
+            put_status(ctx, MonsterStatus { alert: Some(who), alert_until: tick + 10 * TICK_HZ as u64, ..r });
+        }
+    }
+}
+
+/// A monster hitting another (confusion). No credit, no loot.
+fn monster_hits_monster(ctx: &ReducerContext, id: u64, dmg: i32) {
+    let Some(m) = ctx.db.monster().id().find(id) else { return };
+    if m.hp > dmg {
+        ctx.db.monster().id().update(Monster { hp: m.hp - dmg, ..m });
+        wake(ctx, id);
+    } else {
+        remove_monster(ctx, id);
+    }
+}
+
+fn wake(ctx: &ReducerContext, id: u64) {
+    if let Some(r) = ctx.db.monster_status().id().find(id) {
+        if r.sleep_until != 0 {
+            ctx.db.monster_status().id().update(MonsterStatus { sleep_until: 0, ..r });
+        }
+    }
 }
 
 /// Melee the monster `target_id` (must be on an adjacent tile). 0.5 s cooldown.
@@ -102,6 +200,9 @@ pub fn damage_monster(ctx: &ReducerContext, who: Identity, id: u64, dmg: i32) ->
     let stats = ctx.db.player_stats().identity().find(who).ok_or("no stats")?;
     let tick = current_tick(ctx);
     if mon.hp > dmg {
+        wake(ctx, id);
+        let b = behaviour_of(ctx, mon.kind);
+        alert_pack(ctx, &mon, &b, who, tick);
         ctx.db.monster().id().update(Monster { hp: mon.hp - dmg, ..mon });
         return Ok(false);
     }
@@ -169,7 +270,9 @@ pub fn respawn_for(ctx: &ReducerContext, map_id: u8, x: f32, y: f32) -> (u8, f32
     }
 }
 
-/// Monster AI: chase and hit the nearest player in aggro range, else drift home.
+/// Monster AI: each monster acts on its kind's behaviour (core/ai.rs) and its statuses: asleep ones
+/// wait, confused ones fight the nearest other monster, others pick the nearest player in aggro
+/// range (or the one their pack called them to), then melee, shoot, close in or retreat.
 pub fn monster_pass(ctx: &ReducerContext, tick: u64, occ: &mut Occupancy, seeded: bool) {
     if occ.active_maps.is_empty() {
         return;
@@ -184,58 +287,133 @@ pub fn monster_pass(ctx: &ReducerContext, tick: u64, occ: &mut Occupancy, seeded
             if brain.next_act_tick > tick {
                 continue;
             }
+            // A confused neighbour may have killed it earlier in this pass.
+            let Some(mon) = ctx.db.monster().id().find(mon.id) else { continue };
             let Some(kind) = ctx.db.monster_kind().kind().find(mon.kind) else { continue };
-            let here = tile_of(mon.x, mon.y);
-            // Nearest living player on this map within aggro range (not inside a safe zone).
-            let target = players
-                .iter()
-                .filter(|p| p.map_id == m)
-                .map(|p| (tile_dist(here, tile_of(p.x, p.y)), p))
-                .filter(|(d, p)| {
-                    let pt = tile_of(p.x, p.y);
-                    *d <= kind.aggro as i32 && !zones.contains(m, pt.0, pt.1)
-                })
-                .min_by_key(|(d, _)| *d)
-                .map(|(_, p)| (p.identity, tile_of(p.x, p.y)));
+            let b = behaviour_of(ctx, mon.kind);
+            let st = ctx.db.monster_status().id().find(mon.id);
+            let on = |until: u64| until > tick;
             let mut next = tick + kind.step_ticks.max(1) as u64;
-            let goal = match target {
-                Some((who, pt)) if in_melee(here, pt) => {
-                    let dmg = roll(ctx.random(), kind.dmg_min, kind.dmg_max);
-                    hurt_player(ctx, who, dmg, tick);
-                    next = tick + kind.attack_ticks.max(1) as u64;
-                    None
-                }
-                Some((_, pt)) => Some(pt),
-                None if tile_dist(here, (brain.home_x, brain.home_y)) > 2 => Some((brain.home_x, brain.home_y)),
-                None => {
-                    let r: u32 = ctx.random();
-                    if r % 4 == 0 {
-                        let d = DIRS8[((r >> 8) % 8) as usize];
-                        Some((here.0 + d.0, here.1 + d.1))
+            if st.as_ref().map(|s| on(s.sleep_until)).unwrap_or(false) {
+                ctx.db.monster_brain().id().update(MonsterBrain { next_act_tick: next, ..brain });
+                continue;
+            }
+            let here = tile_of(mon.x, mon.y);
+            let confused = st.as_ref().map(|s| on(s.confuse_until)).unwrap_or(false);
+            let silenced = st.as_ref().map(|s| on(s.silence_until)).unwrap_or(false);
+            let feared = st.as_ref().map(|s| on(s.fear_until)).unwrap_or(false);
+            let mut steps: Vec<(i32, i32)> = Vec::new();
+            if confused {
+                // Fight the nearest other monster in aggro range.
+                let foe = ctx
+                    .db
+                    .monster()
+                    .map_id()
+                    .filter(m)
+                    .filter(|o| o.id != mon.id)
+                    .map(|o| (tile_dist(here, tile_of(o.x, o.y)), o))
+                    .filter(|(d, _)| *d <= kind.aggro as i32)
+                    .min_by_key(|(d, _)| *d);
+                if let Some((_, o)) = foe {
+                    let ot = tile_of(o.x, o.y);
+                    if in_melee(here, ot) {
+                        monster_hits_monster(ctx, o.id, roll(ctx.random(), kind.dmg_min, kind.dmg_max));
+                        next = tick + kind.attack_ticks.max(1) as u64;
                     } else {
-                        None
+                        steps = steps_toward(here, ot);
                     }
                 }
-            };
-            if let Some(goal) = goal {
-                for (dx, dy) in steps_toward(here, goal) {
-                    let to = (here.0 + dx, here.1 + dy);
-                    if walkable(ctx, m, to.0, to.1, seeded)
-                        && !occ.has(m, to)
-                        && !zones.contains(m, to.0, to.1)
-                        && portal_at(ctx, m, to.0, to.1).is_none()
-                        && tile_dist(to, (brain.home_x, brain.home_y)) <= MONSTER_LEASH
-                    {
-                        occ.moved(m, here, to);
-                        let (x, y) = (to.0 as f32 + 0.5, to.1 as f32 + 0.5);
-                        ctx.db.monster().id().update(Monster { x, y, cell_x: cell_of(x), cell_y: cell_of(y), ..mon });
-                        break;
+            } else {
+                // Nearest player in aggro range outside safe zones; else the player the pack called.
+                let ok = |p: &&EntityTransform| {
+                    let pt = tile_of(p.x, p.y);
+                    p.map_id == m && !zones.contains(m, pt.0, pt.1)
+                };
+                let mut target = players
+                    .iter()
+                    .filter(ok)
+                    .map(|p| (tile_dist(here, tile_of(p.x, p.y)), p))
+                    .filter(|(d, _)| *d <= kind.aggro as i32)
+                    .min_by_key(|(d, _)| *d)
+                    .map(|(_, p)| (p.identity, tile_of(p.x, p.y)));
+                if target.is_none() {
+                    if let Some(s) = st.as_ref().filter(|s| on(s.alert_until)) {
+                        let reach = kind.aggro as i32 + 2 * b.pack as i32;
+                        target = players
+                            .iter()
+                            .filter(ok)
+                            .find(|p| Some(p.identity) == s.alert && tile_dist(here, tile_of(p.x, p.y)) <= reach)
+                            .map(|p| (p.identity, tile_of(p.x, p.y)));
                     }
+                }
+                match target {
+                    Some((who, pt)) => {
+                        alert_pack(ctx, &mon, &b, who, tick);
+                        let hit = |ctx: &ReducerContext| {
+                            hurt_player(ctx, who, roll(ctx.random(), kind.dmg_min, kind.dmg_max), tick);
+                            tick + kind.attack_ticks.max(1) as u64
+                        };
+                        match decide(&b, here, pt, mon.hp, mon.max_hp, silenced, feared) {
+                            Act::Melee => next = hit(ctx),
+                            Act::Ranged => next = hit(ctx),
+                            Act::Approach => steps = steps_toward(here, pt),
+                            Act::Retreat => {
+                                steps = steps_away(here, pt);
+                                // Cornered: fight back if it can reach.
+                                let can_hit = in_melee(here, pt) || (b.range > 1 && !silenced && tile_dist(here, pt) <= b.range as i32);
+                                if free_step(ctx, m, here, &steps, occ, &zones, &brain, &b, seeded).is_none() && can_hit {
+                                    steps.clear();
+                                    next = hit(ctx);
+                                }
+                            }
+                        }
+                    }
+                    None if b.flags & AI_NO_HOME == 0 && tile_dist(here, (brain.home_x, brain.home_y)) > 2 => {
+                        steps = steps_toward(here, (brain.home_x, brain.home_y));
+                    }
+                    None => {
+                        let r: u32 = ctx.random();
+                        if r % 4 == 0 {
+                            steps = vec![DIRS8[((r >> 8) % 8) as usize]];
+                        }
+                    }
+                }
+            }
+            if b.flags & AI_STATIONARY == 0 {
+                if let Some(to) = free_step(ctx, m, here, &steps, occ, &zones, &brain, &b, seeded) {
+                    occ.moved(m, here, to);
+                    let (x, y) = (to.0 as f32 + 0.5, to.1 as f32 + 0.5);
+                    ctx.db.monster().id().update(Monster { x, y, cell_x: cell_of(x), cell_y: cell_of(y), ..mon });
                 }
             }
             ctx.db.monster_brain().id().update(MonsterBrain { next_act_tick: next, ..brain });
         }
     }
+}
+
+/// The first of `steps` from `here` a monster may take (walkable, free, no zone, no portal, leashed).
+#[allow(clippy::too_many_arguments)]
+fn free_step(
+    ctx: &ReducerContext,
+    m: u8,
+    here: (i32, i32),
+    steps: &[(i32, i32)],
+    occ: &Occupancy,
+    zones: &SafeZones,
+    brain: &MonsterBrain,
+    b: &Behaviour,
+    seeded: bool,
+) -> Option<(i32, i32)> {
+    if b.flags & AI_STATIONARY != 0 {
+        return None;
+    }
+    steps.iter().map(|(dx, dy)| (here.0 + dx, here.1 + dy)).find(|&to| {
+        walkable(ctx, m, to.0, to.1, seeded)
+            && !occ.has(m, to)
+            && !zones.contains(m, to.0, to.1)
+            && portal_at(ctx, m, to.0, to.1).is_none()
+            && (b.flags & AI_NO_HOME != 0 || tile_dist(to, (brain.home_x, brain.home_y)) <= MONSTER_LEASH)
+    })
 }
 
 /// Natural spawning (one per rule per pass) and despawning monsters far from every player.

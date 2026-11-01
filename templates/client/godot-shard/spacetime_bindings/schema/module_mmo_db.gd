@@ -2,43 +2,45 @@
 # FILE WILL NOT BE SAVED. MODIFY TABLES IN YOUR MODULE SOURCE CODE INSTEAD.
 class_name MmoModuleDb extends RefCounted
 
-const table_names : Array[String] = ["npc_meta", "player", "portal", "chat_message", "tick_health", "map_exit", "entity_transform", "map_info", "world_seed", "world_config", "item_kind", "monster", "monster_kind", "player_mods", "npc", "player_stats", "ground_item", "my_inventory"]
+const table_names : Array[String] = ["world_config", "player", "npc", "npc_meta", "map_info", "player_stats", "ground_item", "item_kind", "tick_health", "map_exit", "portal", "chat_message", "player_mods", "entity_transform", "monster_status", "monster", "monster_kind", "world_seed", "my_inventory"]
 
-var npc_meta: MmoNpcMetaTable
-var player: MmoPlayerTable
-var portal: MmoPortalTable
-var chat_message: MmoChatMessageTable
-var tick_health: MmoTickHealthTable
-var map_exit: MmoMapExitTable
-var entity_transform: MmoEntityTransformTable
-var map_info: MmoMapInfoTable
-var world_seed: MmoWorldSeedTable
 var world_config: MmoWorldConfigTable
-var item_kind: MmoItemKindTable
-var monster: MmoMonsterTable
-var monster_kind: MmoMonsterKindTable
-var player_mods: MmoPlayerModsTable
+var player: MmoPlayerTable
 var npc: MmoNpcTable
+var npc_meta: MmoNpcMetaTable
+var map_info: MmoMapInfoTable
 var player_stats: MmoPlayerStatsTable
 var ground_item: MmoGroundItemTable
+var item_kind: MmoItemKindTable
+var tick_health: MmoTickHealthTable
+var map_exit: MmoMapExitTable
+var portal: MmoPortalTable
+var chat_message: MmoChatMessageTable
+var player_mods: MmoPlayerModsTable
+var entity_transform: MmoEntityTransformTable
+var monster_status: MmoMonsterStatusTable
+var monster: MmoMonsterTable
+var monster_kind: MmoMonsterKindTable
+var world_seed: MmoWorldSeedTable
 var my_inventory: MmoMyInventoryTable
 
 func _init(p_local_db: LocalDatabase) -> void:
-	npc_meta = preload('res://spacetime_bindings/schema/tables/mmo_npc_meta_table.gd').create(p_local_db)
-	player = preload('res://spacetime_bindings/schema/tables/mmo_player_table.gd').create(p_local_db)
-	portal = preload('res://spacetime_bindings/schema/tables/mmo_portal_table.gd').create(p_local_db)
-	chat_message = preload('res://spacetime_bindings/schema/tables/mmo_chat_message_table.gd').create(p_local_db)
-	tick_health = preload('res://spacetime_bindings/schema/tables/mmo_tick_health_table.gd').create(p_local_db)
-	map_exit = preload('res://spacetime_bindings/schema/tables/mmo_map_exit_table.gd').create(p_local_db)
-	entity_transform = preload('res://spacetime_bindings/schema/tables/mmo_entity_transform_table.gd').create(p_local_db)
-	map_info = preload('res://spacetime_bindings/schema/tables/mmo_map_info_table.gd').create(p_local_db)
-	world_seed = preload('res://spacetime_bindings/schema/tables/mmo_world_seed_table.gd').create(p_local_db)
 	world_config = preload('res://spacetime_bindings/schema/tables/mmo_world_config_table.gd').create(p_local_db)
-	item_kind = preload('res://spacetime_bindings/schema/tables/mmo_item_kind_table.gd').create(p_local_db)
-	monster = preload('res://spacetime_bindings/schema/tables/mmo_monster_table.gd').create(p_local_db)
-	monster_kind = preload('res://spacetime_bindings/schema/tables/mmo_monster_kind_table.gd').create(p_local_db)
-	player_mods = preload('res://spacetime_bindings/schema/tables/mmo_player_mods_table.gd').create(p_local_db)
+	player = preload('res://spacetime_bindings/schema/tables/mmo_player_table.gd').create(p_local_db)
 	npc = preload('res://spacetime_bindings/schema/tables/mmo_npc_table.gd').create(p_local_db)
+	npc_meta = preload('res://spacetime_bindings/schema/tables/mmo_npc_meta_table.gd').create(p_local_db)
+	map_info = preload('res://spacetime_bindings/schema/tables/mmo_map_info_table.gd').create(p_local_db)
 	player_stats = preload('res://spacetime_bindings/schema/tables/mmo_player_stats_table.gd').create(p_local_db)
 	ground_item = preload('res://spacetime_bindings/schema/tables/mmo_ground_item_table.gd').create(p_local_db)
+	item_kind = preload('res://spacetime_bindings/schema/tables/mmo_item_kind_table.gd').create(p_local_db)
+	tick_health = preload('res://spacetime_bindings/schema/tables/mmo_tick_health_table.gd').create(p_local_db)
+	map_exit = preload('res://spacetime_bindings/schema/tables/mmo_map_exit_table.gd').create(p_local_db)
+	portal = preload('res://spacetime_bindings/schema/tables/mmo_portal_table.gd').create(p_local_db)
+	chat_message = preload('res://spacetime_bindings/schema/tables/mmo_chat_message_table.gd').create(p_local_db)
+	player_mods = preload('res://spacetime_bindings/schema/tables/mmo_player_mods_table.gd').create(p_local_db)
+	entity_transform = preload('res://spacetime_bindings/schema/tables/mmo_entity_transform_table.gd').create(p_local_db)
+	monster_status = preload('res://spacetime_bindings/schema/tables/mmo_monster_status_table.gd').create(p_local_db)
+	monster = preload('res://spacetime_bindings/schema/tables/mmo_monster_table.gd').create(p_local_db)
+	monster_kind = preload('res://spacetime_bindings/schema/tables/mmo_monster_kind_table.gd').create(p_local_db)
+	world_seed = preload('res://spacetime_bindings/schema/tables/mmo_world_seed_table.gd').create(p_local_db)
 	my_inventory = preload('res://spacetime_bindings/schema/tables/mmo_my_inventory_table.gd').create(p_local_db)

@@ -27,6 +27,25 @@ A game's own module (`server/src/<game>/`) builds on the core without editing it
   level-ups stop at the cap; raise it and call `combat::apply_level` to promote).
 - `combat::damage_monster(ctx, who, monster_id, dmg)` — damage with kill credit (spells, traps).
 - `combat::hurt_player`, `movement::place` (teleport/map change with AOI bookkeeping), `combat::mods_of`.
+- `combat::set_status(ctx, monster_id, ai::STATUS_*, ticks)` / `combat::clear_statuses` — timed monster
+  statuses for spells: `STATUS_SLEEP` (skips turns, damage wakes it), `STATUS_CONFUSE` (fights the nearest
+  other monster), `STATUS_SILENCE` (no ranged attacks), `STATUS_FEAR` (runs away). The public
+  `monster_status` table lets clients draw them. `combat::behaviour_of(kind)` reads a kind's behaviour
+  (games keep their own per-kind flags in the high 16 bits of `flags`, e.g. "undead").
+
+### Monster behaviour (data-driven, `core/ai.rs`)
+
+Each monster kind may carry an `ai` object (seeded with `seed_monster_ai`; no object = melee brute):
+
+| Field | Meaning |
+|---|---|
+| `flee_hp_pct` | runs from its target at or below this % of max HP (0 = never); fights back when cornered |
+| `range` | ranged attack reach in tiles (0/1 = melee only); uses the kind's damage and attack ticks; no line-of-sight test |
+| `keep_dist` | a ranged attacker steps back while the target is closer than this |
+| `pack` | radius: when one engages or is hit, kin of the same kind in the radius join in on that player (10 s alert) |
+| `flags` | bit 0 `AI_STATIONARY` (never steps), bit 1 `AI_NO_HOME` (no leash, no drifting home); bits 16-31 game-defined |
+
+The decision (`ai::decide`) is a pure function with unit tests (`cargo test --lib ai`).
 
 ## 1. Server: the `mmo-core-world/1` document
 
@@ -46,7 +65,7 @@ inventory) are kept, and a player whose saved tile is no longer walkable is move
 | `map_exits` | `[{map_id, to_map, x, y}]` | walking off the edge of `map_id` (needs `exit_at_edge`) puts you at `to_map:x,y` |
 | `portals` | `[{id, name, from_map, x, y, to_map, to_x, to_y}]` | stepping on `from_map:x,y` teleports (towns, moongates, ladders) |
 | `npcs` | `[{map_id, slot, tile, x, y, wander, talk}]` | server-simulated; `talk` is an opaque per-map dialogue reference for the client (0 = none) |
-| `monster_kinds` | `[{kind, name, tile, hp, dmg_min, dmg_max, step_ticks, attack_ticks, aggro, xp, gold_min, gold_max}]` | |
+| `monster_kinds` | `[{kind, name, tile, hp, dmg_min, dmg_max, step_ticks, attack_ticks, aggro, xp, gold_min, gold_max, ai?}]` | `ai` = optional `{flee_hp_pct, range, keep_dist, pack, flags}` (see "Monster behaviour") |
 | `spawn_rules` | `[{id, map_id, max_alive, kinds[], min_dist, max_dist}]` | monsters spawn around players, outside safe zones |
 | `safe_zones` | `[{id, map_id, x, y, r}]` | no spawning, no combat (Chebyshev radius) |
 | `respawns` | `[{id, map_id, x, y}]` | where the dead return (nearest on the same map, else the lowest id) |

@@ -332,6 +332,33 @@ pub struct MonsterBrain {
     pub next_act_tick: u64,
 }
 
+/// Private: per-kind behaviour (adapter-seeded with `seed_monster_ai`; no row = melee brute).
+/// See core/ai.rs for the meaning of each field and the core `flags` bits.
+#[table(accessor = monster_ai)]
+pub struct MonsterAi {
+    #[primary_key]
+    pub kind: u8,
+    pub flee_hp_pct: u8,
+    pub range: u8,
+    pub keep_dist: u8,
+    pub pack: u8,
+    pub flags: u32,
+}
+
+/// Public: timed statuses on one live monster (games set them, e.g. sleep or confusion spells),
+/// plus the pack alert (who its kin called it to fight). Ticks are `world_clock` ticks; 0 = off.
+#[table(accessor = monster_status, public)]
+pub struct MonsterStatus {
+    #[primary_key]
+    pub id: u64,
+    pub sleep_until: u64,
+    pub confuse_until: u64,
+    pub silence_until: u64,
+    pub fear_until: u64,
+    pub alert: Option<Identity>,
+    pub alert_until: u64,
+}
+
 /// Private: natural spawning per map (adapter-seeded). Spawns happen near online players.
 #[table(accessor = spawn_rule)]
 pub struct SpawnRule {

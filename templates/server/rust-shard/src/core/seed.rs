@@ -62,6 +62,8 @@ pub fn seed_begin(ctx: &ReducerContext, kind: String, tag: String) -> Result<(),
     clear!(monster, id);
     clear!(monster_brain, id);
     clear!(monster_kind, kind);
+    clear!(monster_ai, kind);
+    clear!(monster_status, id);
     clear!(spawn_rule, id);
     clear!(safe_zone, id);
     clear!(respawn_point, id);
@@ -251,6 +253,23 @@ pub fn seed_monster_kind(
         ctx.db.monster_kind().kind().update(row);
     } else {
         ctx.db.monster_kind().insert(row);
+    }
+    Ok(())
+}
+
+/// Behaviour for monster `kind` (see core/ai.rs): flee threshold in %, ranged reach and kept
+/// distance in tiles, pack radius, flags (low 16 bits core, high 16 bits game-defined).
+#[reducer]
+pub fn seed_monster_ai(ctx: &ReducerContext, kind: u8, flee_hp_pct: u8, range: u8, keep_dist: u8, pack: u8, flags: u32) -> Result<(), String> {
+    require_admin(ctx)?;
+    if flee_hp_pct > 100 || range > 16 || keep_dist > range.max(1) || pack > 16 {
+        return Err("bad monster ai".into());
+    }
+    let row = MonsterAi { kind, flee_hp_pct, range, keep_dist, pack, flags };
+    if ctx.db.monster_ai().kind().find(kind).is_some() {
+        ctx.db.monster_ai().kind().update(row);
+    } else {
+        ctx.db.monster_ai().insert(row);
     }
     Ok(())
 }

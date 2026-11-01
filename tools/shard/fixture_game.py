@@ -89,9 +89,11 @@ def build() -> dict:
         "npcs": npcs,
         "monster_kinds": [
             {"kind": 1, "name": "field mouse", "tile": 80, "hp": 4, "dmg_min": 1, "dmg_max": 2, "step_ticks": 6,
-             "attack_ticks": 20, "aggro": 4, "xp": 6, "gold_min": 1, "gold_max": 3},
+             "attack_ticks": 20, "aggro": 4, "xp": 6, "gold_min": 1, "gold_max": 3,
+             "ai": {"flee_hp_pct": 25, "pack": 5}},
             {"kind": 2, "name": "bog wisp", "tile": 82, "hp": 12, "dmg_min": 2, "dmg_max": 4, "step_ticks": 8,
-             "attack_ticks": 20, "aggro": 6, "xp": 15, "gold_min": 2, "gold_max": 6},
+             "attack_ticks": 20, "aggro": 6, "xp": 15, "gold_min": 2, "gold_max": 6,
+             "ai": {"range": 4, "keep_dist": 2}},
         ],
         "spawn_rules": [{"id": 1, "map_id": SURFACE, "max_alive": 10, "kinds": [1, 1, 2], "min_dist": 6, "max_dist": 12}],
         "safe_zones": [{"id": 0, "map_id": SURFACE, "x": 20, "y": 32, "r": 6},

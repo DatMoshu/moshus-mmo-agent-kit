@@ -102,6 +102,10 @@ def seed(doc: dict, url: str, db: str, jobs: int = 8) -> dict:
     for k in doc.get("monster_kinds", []):
         work.append(("seed_monster_kind", k["kind"], k["name"], k["tile"], k["hp"], k["dmg_min"], k["dmg_max"],
                      k["step_ticks"], k["attack_ticks"], k["aggro"], k["xp"], k["gold_min"], k["gold_max"]))
+        if k.get("ai"):  # optional behaviour (docs/SHARD_CORE.md, core/ai.rs)
+            a = k["ai"]
+            work.append(("seed_monster_ai", k["kind"], a.get("flee_hp_pct", 0), a.get("range", 0), a.get("keep_dist", 0),
+                         a.get("pack", 0), a.get("flags", 0)))
     for r in doc.get("spawn_rules", []):
         work.append(("seed_spawn_rule", r["id"], r["map_id"], r["max_alive"], r["kinds"], r["min_dist"], r["max_dist"]))
     for z in doc.get("safe_zones", []):
