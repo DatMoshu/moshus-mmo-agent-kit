@@ -19,14 +19,14 @@
 ##   Playtest:   --autopilot --route play [--profile P] (chat, enter map 1, talk to an NPC, leave, fight,
 ##               loot, die and respawn; driven by a play_check harness) and --route resume (reconnect check).
 ##   Bench:      --bench [--bench-seconds S] (no server): scripted walk, prints frame times + chunk build times.
-##   Tilesets:   F4 next tileset pack (docs/SHARD_CORE.md "Tilesets"); --tileset ID starts
+##   Tilesets:   F4 next / Shift+F3 previous tileset pack (docs/SHARD_CORE.md "Tilesets"); --tileset ID starts
 ##               with that pack (not saved); the last pack picked with F4 is saved as render/tileset in
 ##               user://settings.cfg. --tileset-dir DIR adds a folder of packs (besides user://tilesets).
 ##               --tileset-check [--shots DIR] (no server): cycle every pack on map 0 in the current renderer,
 ##               print one TILESET_CHECK line per pack and PASS / FAIL (exit code 0 / 1).
 ## HUD hook: Game.make_hud(main) -> Hud (optional; null = the core HUD) supplies the game's own Hud subclass at
 ## start; set_hud(h) swaps it later. Tileset API for a game UI: tileset_list(), tileset_id(), set_tileset(id),
-## cycle_tileset(step), signal tileset_changed(id).
+## cycle_tileset(step), signal tileset_changed(id); tileset_list() entries carry an optional 4x4 `preview` texture.
 ##
 ## Layout: core client = net/ (NetSession: server state + AOI + intents), render/ (MapRenderer; TileRenderer2D,
 ## VoxelRenderer3D; TileSource = the adapter contract), ui/ (Hud), core/ (Conversation, DocSource,
@@ -53,7 +53,7 @@ var renderer: MapRenderer
 var renderer_kind := ""
 var _renderers := {} # kind -> MapRenderer (kept alive while hidden so switching back is instant)
 var _renderer_opts := {}
-var hud := Hud.new()
+var hud: Hud # built in _ready: Game.make_hud(main), else the core Hud (never created when a game supplies one)
 signal hud_changed(hud: Hud)
 signal tileset_changed(id: String)
 const SETTINGS := "user://settings.cfg"
@@ -87,10 +87,9 @@ func _ready() -> void:
 		var p: PackedStringArray = kv.split("=")
 		_renderer_opts[p[0]] = p[1] if p.size() > 1 else "true"
 	_init_tilesets()
-	var custom := _game_hud()
-	if custom:
-		hud.free() # the default HUD was never added (its _ready never ran)
-		hud = custom
+	hud = _game_hud()
+	if hud == null:
+		hud = Hud.new()
 	add_child(hud)
 	hud.visible = _args.has("hud") or not (_args.has("autopilot") or _args.has("bench") or _args.has("shots") \
 		or _args.has("tileset-check"))
@@ -203,19 +202,25 @@ func cycle_tileset(step := 1, persist := true) -> String:
 	return _tileset_id
 
 
-## One dictionary per pack (id, name, platform, credit, licence, url, builtin, dir, cell, mapped, ...).
 ## Id of the active pack ("" before the source has art).
 func tileset_id() -> String:
 	return _tileset_id
 
 
-## Every available pack: {id, name, platform, credit, licence, url, builtin, dir, cell, mapped, animated,
-## voxel_colour, active}.
+## Every available pack, one dictionary each: {id, name, platform, credit, licence, url, builtin, dir, cell,
+## mapped, animated, voxel_colour, active, preview}. `preview` (optional, absent when the pack has no art) is a
+## Texture2D of 4x4 tiles: the ids from src.preview_tiles() when the game's TileSource defines it, else 0..15.
 func tileset_list() -> Array[Dictionary]:
 	var out: Array[Dictionary] = []
+	var tiles := PackedInt32Array()
+	if src and src.has_method("preview_tiles"):
+		tiles = src.call("preview_tiles")
 	for p in tilesets:
 		var d := p.info()
 		d["active"] = p.id == _tileset_id
+		var tex := p.preview(tiles)
+		if tex:
+			d["preview"] = tex
 		out.append(d)
 	return out
 
@@ -294,6 +299,8 @@ func _unhandled_input(ev: InputEvent) -> void:
 		return
 	var handled := true
 	match ev.keycode:
+		KEY_F3 when ev.shift_pressed:
+			cycle_tileset(-1) # Shift+F3: previous tileset
 		KEY_TAB, KEY_F3:
 			toggle_renderer()
 		KEY_F4:
@@ -1169,10 +1176,19 @@ func _hooks_check(st: MapViewState, fails: Array[String]) -> void:
 	renderer.set_screen_offset(Vector2.ZERO)
 
 
+func _key(code: Key, shift: bool) -> InputEventKey:
+	var k := InputEventKey.new()
+	k.keycode = code
+	k.shift_pressed = shift
+	k.pressed = true
+	return k
+
+
 ## ---------------------------------------------------------------- --tileset-check (offline, no server)
 ## Cycles every pack on map 0 around Game.bench_start in the current renderer: each pack must resolve all 256
 ## tiles at its cell size and become the renderers' atlas; the default pack must be the source's own atlas byte for
-## byte; F4-style cycling must visit every pack once and come back; an unknown id must be refused.
+## byte; F4-style cycling must visit every pack once and come back, Shift+F3 / F4 must step back / forward, every
+## tileset_list() entry must carry a 4x4-tile preview; an unknown id must be refused.
 ## --shots DIR saves tileset_<id>_<renderer>.png per pack (needs a display; local evidence only, never in git).
 ## --tileset-expect a,b: ids that must be present.
 func _tileset_check() -> void:
@@ -1239,6 +1255,24 @@ func _tileset_check() -> void:
 		if back != tilesets[-1].id:
 			fails.append("cycle_tileset(-1) from the first pack gave %s, expected %s" % [back, tilesets[-1].id])
 		cycle_tileset(1, false)
+		# the player keys: Shift+F3 = previous, F4 = next (settings are never saved in this mode)
+		var kind0 := renderer_kind
+		_unhandled_input(_key(KEY_F3, true))
+		var prev := _tileset_id
+		_unhandled_input(_key(KEY_F4, false))
+		var ok_keys := prev == tilesets[-1].id and _tileset_id == first and renderer_kind == kind0 # Shift+F3 must not switch view
+		print("TILESET_CHECK keys shift_f3=%s f4=%s %s" % [prev, _tileset_id, "ok" if ok_keys else "BAD"])
+		if not ok_keys:
+			fails.append("Shift+F3 / F4 gave %s / %s, expected %s / %s" % [prev, _tileset_id, tilesets[-1].id, first])
+	var previews := 0
+	for d in tileset_list():
+		var pv = d.get("preview")
+		var pk := Tilesets.find(tilesets, String(d.id))
+		if pv is Texture2D and pk and pv.get_width() == 4 * pk.cell and pv.get_height() == 4 * pk.cell:
+			previews += 1
+		else:
+			fails.append("%s: tileset_list() preview missing or not 4x4 tiles" % d.id)
+	print("TILESET_CHECK preview packs=%d/%d" % [previews, tilesets.size()])
 	if set_tileset("no-such-pack", false) or _tileset_id != first:
 		fails.append("an unknown id was accepted")
 	await _hooks_check(st, fails)

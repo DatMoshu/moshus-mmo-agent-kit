@@ -24,7 +24,7 @@ const HELP := """Controls
   T                   talk to the nearest adjacent townsperson
   Enter               chat (Enter sends, Esc cancels)
   Tab / F3            switch 2D / 3D view
-  F4                  next tileset (art pack)
+  F4 / Shift+F3       next / previous tileset (art pack)
   Shift+F4, F5..F12, [ ]  3D view toggles and camera pitch (listed on the status line)
   F1                  show / hide this help
 Walk off a town's edge to leave it; step on a moongate to travel."""
@@ -40,6 +40,15 @@ var _talk_panel := PanelContainer.new()
 var _talk_title := Label.new()
 var _talk_text := Label.new()
 var _talk_in := LineEdit.new()
+
+
+## The default widgets are built in member initialisers, so a subclass that skips super._ready() (or a Hud
+## freed before entering the tree) would leave them orphaned: free whichever never got a parent.
+func _notification(what: int) -> void:
+	if what == NOTIFICATION_PREDELETE:
+		for n in [_status, _inv, _chat_log, _chat_in, _toast, _help, _talk_panel, _talk_title, _talk_text, _talk_in]:
+			if is_instance_valid(n) and n.get_parent() == null:
+				n.free()
 
 
 func _ready() -> void:

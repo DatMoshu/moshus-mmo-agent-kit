@@ -31,6 +31,8 @@ var anims := {}             # tile id -> PackedInt32Array of cell indices (first
 var anim_fps := 0.0
 var error := ""
 var _small: Image
+var _preview: ImageTexture
+var _preview_key := PackedInt32Array()
 
 
 ## Problems with a manifest (empty = valid). `platforms` = the game's allowed platform ids (empty = any slug).
@@ -343,6 +345,25 @@ func image_16() -> Image:
 		if cell != TileSource.TILE_PX:
 			_small.resize(16 * TileSource.TILE_PX, 16 * TileSource.TILE_PX, Image.INTERPOLATE_BILINEAR)
 	return _small
+
+
+## A 4x4-tile thumbnail (16 tile ids, row-major; empty = ids 0..15) at the pack's native cell size, cached.
+## null when the pack has no art.
+func preview(tiles := PackedInt32Array()) -> Texture2D:
+	if image == null:
+		return null
+	var ids := tiles
+	if ids.is_empty():
+		ids = PackedInt32Array(range(16))
+	if _preview and ids == _preview_key:
+		return _preview
+	var img := Image.create(4 * cell, 4 * cell, false, Image.FORMAT_RGBA8)
+	for i in mini(ids.size(), 16):
+		var t := clampi(ids[i], 0, TILES - 1)
+		img.blit_rect(image, Rect2i(rect(t)), Vector2i((i % 4) * cell, (i / 4) * cell))
+	_preview = ImageTexture.create_from_image(img)
+	_preview_key = ids
+	return _preview
 
 
 func mapped_count() -> int:
