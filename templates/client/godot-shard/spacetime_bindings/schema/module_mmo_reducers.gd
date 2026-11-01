@@ -45,6 +45,11 @@ func revoke_identity(identity: PackedByteArray) -> SpacetimeDBReducerCall:
 func say(text: String) -> SpacetimeDBReducerCall:
 	return _client.call_reducer('say', [text], [&'String'])
 
+## 0. channel: int [br]
+## 1. text: String [br]
+func say_in(channel: int, text: String) -> SpacetimeDBReducerCall:
+	return _client.call_reducer('say_in', [channel, text], [&'U8', &'String'])
+
 ## 0. kind: String [br]
 ## 1. tag: String [br]
 func seed_begin(kind: String, tag: String) -> SpacetimeDBReducerCall:
@@ -172,4 +177,9 @@ func set_input(dir_x: int, dir_y: int, seq: int) -> SpacetimeDBReducerCall:
 ## 0. kind: int [br]
 func use_item(kind: int) -> SpacetimeDBReducerCall:
 	return _client.call_reducer('use_item', [kind], [&'U16'])
+
+## 0. to_name: String [br]
+## 1. text: String [br]
+func whisper(to_name: String, text: String) -> SpacetimeDBReducerCall:
+	return _client.call_reducer('whisper', [to_name, text], [&'String', &'String'])
 

@@ -5,11 +5,15 @@ class_name MmoModuleClient extends SpacetimeDBClient
 
 const Types = preload('res://spacetime_bindings/schema/module_mmo_types.gd')
 
+const ChatChannel = Types.ChatChannel
+const ChatDirect = Types.ChatDirect
 const ChatMessage = Types.ChatMessage
+const CombatEvent = Types.CombatEvent
 const EntityTransform = Types.EntityTransform
 const GroundItem = Types.GroundItem
 const InventoryItem = Types.InventoryItem
 const ItemKind = Types.ItemKind
+const LevelXp = Types.LevelXp
 const MapExit = Types.MapExit
 const MapInfo = Types.MapInfo
 const Monster = Types.Monster

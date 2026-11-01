@@ -2,45 +2,53 @@
 # FILE WILL NOT BE SAVED. MODIFY TABLES IN YOUR MODULE SOURCE CODE INSTEAD.
 class_name MmoModuleDb extends RefCounted
 
-const table_names : Array[String] = ["world_config", "player", "npc", "npc_meta", "map_info", "player_stats", "ground_item", "item_kind", "tick_health", "map_exit", "portal", "chat_message", "player_mods", "entity_transform", "monster_status", "monster", "monster_kind", "world_seed", "my_inventory"]
+const table_names : Array[String] = ["level_xp", "player_mods", "chat_channel", "player_stats", "monster", "tick_health", "npc_meta", "map_info", "entity_transform", "npc", "world_config", "player", "monster_status", "ground_item", "chat_message", "combat_event", "map_exit", "monster_kind", "world_seed", "portal", "item_kind", "my_chat", "my_inventory"]
 
-var world_config: MmoWorldConfigTable
-var player: MmoPlayerTable
-var npc: MmoNpcTable
+var level_xp: MmoLevelXpTable
+var player_mods: MmoPlayerModsTable
+var chat_channel: MmoChatChannelTable
+var player_stats: MmoPlayerStatsTable
+var monster: MmoMonsterTable
+var tick_health: MmoTickHealthTable
 var npc_meta: MmoNpcMetaTable
 var map_info: MmoMapInfoTable
-var player_stats: MmoPlayerStatsTable
-var ground_item: MmoGroundItemTable
-var item_kind: MmoItemKindTable
-var tick_health: MmoTickHealthTable
-var map_exit: MmoMapExitTable
-var portal: MmoPortalTable
-var chat_message: MmoChatMessageTable
-var player_mods: MmoPlayerModsTable
 var entity_transform: MmoEntityTransformTable
+var npc: MmoNpcTable
+var world_config: MmoWorldConfigTable
+var player: MmoPlayerTable
 var monster_status: MmoMonsterStatusTable
-var monster: MmoMonsterTable
+var ground_item: MmoGroundItemTable
+var chat_message: MmoChatMessageTable
+var combat_event: MmoCombatEventTable
+var map_exit: MmoMapExitTable
 var monster_kind: MmoMonsterKindTable
 var world_seed: MmoWorldSeedTable
+var portal: MmoPortalTable
+var item_kind: MmoItemKindTable
+var my_chat: MmoMyChatTable
 var my_inventory: MmoMyInventoryTable
 
 func _init(p_local_db: LocalDatabase) -> void:
-	world_config = preload('res://spacetime_bindings/schema/tables/mmo_world_config_table.gd').create(p_local_db)
-	player = preload('res://spacetime_bindings/schema/tables/mmo_player_table.gd').create(p_local_db)
-	npc = preload('res://spacetime_bindings/schema/tables/mmo_npc_table.gd').create(p_local_db)
+	level_xp = preload('res://spacetime_bindings/schema/tables/mmo_level_xp_table.gd').create(p_local_db)
+	player_mods = preload('res://spacetime_bindings/schema/tables/mmo_player_mods_table.gd').create(p_local_db)
+	chat_channel = preload('res://spacetime_bindings/schema/tables/mmo_chat_channel_table.gd').create(p_local_db)
+	player_stats = preload('res://spacetime_bindings/schema/tables/mmo_player_stats_table.gd').create(p_local_db)
+	monster = preload('res://spacetime_bindings/schema/tables/mmo_monster_table.gd').create(p_local_db)
+	tick_health = preload('res://spacetime_bindings/schema/tables/mmo_tick_health_table.gd').create(p_local_db)
 	npc_meta = preload('res://spacetime_bindings/schema/tables/mmo_npc_meta_table.gd').create(p_local_db)
 	map_info = preload('res://spacetime_bindings/schema/tables/mmo_map_info_table.gd').create(p_local_db)
-	player_stats = preload('res://spacetime_bindings/schema/tables/mmo_player_stats_table.gd').create(p_local_db)
-	ground_item = preload('res://spacetime_bindings/schema/tables/mmo_ground_item_table.gd').create(p_local_db)
-	item_kind = preload('res://spacetime_bindings/schema/tables/mmo_item_kind_table.gd').create(p_local_db)
-	tick_health = preload('res://spacetime_bindings/schema/tables/mmo_tick_health_table.gd').create(p_local_db)
-	map_exit = preload('res://spacetime_bindings/schema/tables/mmo_map_exit_table.gd').create(p_local_db)
-	portal = preload('res://spacetime_bindings/schema/tables/mmo_portal_table.gd').create(p_local_db)
-	chat_message = preload('res://spacetime_bindings/schema/tables/mmo_chat_message_table.gd').create(p_local_db)
-	player_mods = preload('res://spacetime_bindings/schema/tables/mmo_player_mods_table.gd').create(p_local_db)
 	entity_transform = preload('res://spacetime_bindings/schema/tables/mmo_entity_transform_table.gd').create(p_local_db)
+	npc = preload('res://spacetime_bindings/schema/tables/mmo_npc_table.gd').create(p_local_db)
+	world_config = preload('res://spacetime_bindings/schema/tables/mmo_world_config_table.gd').create(p_local_db)
+	player = preload('res://spacetime_bindings/schema/tables/mmo_player_table.gd').create(p_local_db)
 	monster_status = preload('res://spacetime_bindings/schema/tables/mmo_monster_status_table.gd').create(p_local_db)
-	monster = preload('res://spacetime_bindings/schema/tables/mmo_monster_table.gd').create(p_local_db)
+	ground_item = preload('res://spacetime_bindings/schema/tables/mmo_ground_item_table.gd').create(p_local_db)
+	chat_message = preload('res://spacetime_bindings/schema/tables/mmo_chat_message_table.gd').create(p_local_db)
+	combat_event = preload('res://spacetime_bindings/schema/tables/mmo_combat_event_table.gd').create(p_local_db)
+	map_exit = preload('res://spacetime_bindings/schema/tables/mmo_map_exit_table.gd').create(p_local_db)
 	monster_kind = preload('res://spacetime_bindings/schema/tables/mmo_monster_kind_table.gd').create(p_local_db)
 	world_seed = preload('res://spacetime_bindings/schema/tables/mmo_world_seed_table.gd').create(p_local_db)
+	portal = preload('res://spacetime_bindings/schema/tables/mmo_portal_table.gd').create(p_local_db)
+	item_kind = preload('res://spacetime_bindings/schema/tables/mmo_item_kind_table.gd').create(p_local_db)
+	my_chat = preload('res://spacetime_bindings/schema/tables/mmo_my_chat_table.gd').create(p_local_db)
 	my_inventory = preload('res://spacetime_bindings/schema/tables/mmo_my_inventory_table.gd').create(p_local_db)

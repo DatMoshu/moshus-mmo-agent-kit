@@ -50,6 +50,7 @@ pub fn init(ctx: &ReducerContext) {
 #[reducer(client_connected)]
 pub fn on_connect(ctx: &ReducerContext) -> Result<(), String> {
     require_admitted(ctx)?;
+    ensure_level_table(ctx); // worlds published before `level_xp` existed
     if let Some(p) = ctx.db.player().identity().find(ctx.sender()) {
         ctx.db.player().identity().update(Player { online: true, last_seen: ctx.timestamp, ..p });
     }
@@ -199,6 +200,7 @@ pub fn ensure_world_inner(ctx: &ReducerContext, admin: Identity) {
             level: 0,
         });
     }
+    ensure_level_table(ctx);
     if ctx.db.tick_schedule().count() == 0 {
         ctx.db.tick_schedule().insert(TickSchedule {
             scheduled_id: 0,
@@ -232,4 +234,17 @@ pub fn revoke_identity(ctx: &ReducerContext, identity: Identity) -> Result<(), S
         ctx.db.player_input().identity().update(PlayerInput { dir_x: 0, dir_y: 0, ..i });
     }
     Ok(())
+}
+
+/// Fill the public `level_xp` table from the core rules (once; cheap check afterwards).
+pub fn ensure_level_table(ctx: &ReducerContext) {
+    if ctx.db.level_xp().level().find(LEVEL_TABLE_MAX).is_some() {
+        return;
+    }
+    for level in 1..=LEVEL_TABLE_MAX {
+        if ctx.db.level_xp().level().find(level).is_none() {
+            let xp = (level - 1) * XP_PER_LEVEL;
+            ctx.db.level_xp().insert(LevelXp { level, xp, max_hp: max_hp_for_level(level) });
+        }
+    }
 }

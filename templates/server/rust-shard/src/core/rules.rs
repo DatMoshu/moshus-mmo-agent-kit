@@ -32,6 +32,23 @@ pub const CHAT_WINDOW_US: i64 = 5_000_000;
 pub const BASE_HP: i32 = 30;
 pub const HP_PER_LEVEL: i32 = 5;
 pub const XP_PER_LEVEL: u32 = 100;
+/// Levels written to the public `level_xp` table.
+pub const LEVEL_TABLE_MAX: u32 = 100;
+/// Chat channels: `chat_message` carries LOCAL / WORLD (side table `chat_channel`); `chat_direct` the rest.
+pub const CH_LOCAL: u8 = 0;
+pub const CH_WORLD: u8 = 1;
+pub const CH_PARTY: u8 = 2;
+pub const CH_SYSTEM: u8 = 3;
+pub const CH_WHISPER: u8 = 4;
+pub const CHAT_DIRECT_KEEP: usize = 50;
+/// Combat events (`combat_event`): kinds and flags. Games may add kinds from 16 up.
+pub const COMBAT_KEEP: u64 = 256;
+pub const COMBAT_MELEE: u8 = 0;
+pub const COMBAT_SPELL: u8 = 1;
+pub const COMBAT_HEAL: u8 = 2;
+pub const COMBAT_OTHER: u8 = 3;
+pub const COMBAT_F_KILL: u8 = 1;
+pub const COMBAT_F_DEATH: u8 = 2;
 
 pub fn cell_of(v: f32) -> i32 {
     (v / CELL_SIZE).floor() as i32

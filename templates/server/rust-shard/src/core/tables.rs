@@ -245,6 +245,33 @@ pub struct ChatMessage {
     pub sent_at: Timestamp,
 }
 
+/// Public side table of `chat_message`: the line's channel (`CH_LOCAL` or `CH_WORLD`, rules.rs).
+/// No row = `CH_WORLD` (lines from before channels existed and the plain `say` reducer).
+#[table(accessor = chat_channel, public)]
+pub struct ChatChannel {
+    #[primary_key]
+    pub id: u64,
+    pub channel: u8,
+}
+
+/// Private: chat lines for some readers only (whispers, a game's party chat, system notices), one row
+/// per reader; each player reads their own through the `my_chat` view. The last CHAT_DIRECT_KEEP per
+/// reader are kept. `target_name` is who a whisper went to (so the sender's copy can show it).
+#[table(accessor = chat_direct)]
+pub struct ChatDirect {
+    #[primary_key]
+    #[auto_inc]
+    pub id: u64,
+    #[index(btree)]
+    pub to: Identity,
+    pub sender: Identity,
+    pub name: String,
+    pub channel: u8,
+    pub target_name: String,
+    pub text: String,
+    pub sent_at: Timestamp,
+}
+
 /// Private: per-identity chat rate window.
 #[table(accessor = chat_rate)]
 pub struct ChatRate {
@@ -270,6 +297,38 @@ pub struct PlayerStats {
     pub gold: u32,
     pub kills: u32,
     pub deaths: u32,
+}
+
+/// Public: XP and max HP per level (core rules, written on init and on connect), so clients can draw an
+/// XP bar: the next level needs `level_xp[level + 1].xp`. A game's `player_mods.level_cap` still applies.
+#[table(accessor = level_xp, public)]
+pub struct LevelXp {
+    #[primary_key]
+    pub level: u32,
+    pub xp: u32,
+    pub max_hp: i32,
+}
+
+/// Public, short-lived: one row per hit, heal or kill for floating combat numbers (the last COMBAT_KEEP
+/// are kept). Subscribe by map. `src_*` / `dst_*`: a player identity or a monster id (0 = none);
+/// `kind` is COMBAT_* and `flags` COMBAT_F_* (rules.rs); `amount` is what was actually dealt.
+#[table(accessor = combat_event, public)]
+pub struct CombatEvent {
+    #[primary_key]
+    #[auto_inc]
+    pub id: u64,
+    #[index(btree)]
+    pub map_id: u8,
+    pub x: f32,
+    pub y: f32,
+    pub src_player: Option<Identity>,
+    pub src_monster: u64,
+    pub dst_player: Option<Identity>,
+    pub dst_monster: u64,
+    pub amount: i32,
+    pub kind: u8,
+    pub flags: u8,
+    pub tick: u64,
 }
 
 /// Private: combat timers per player (cooldowns), kept out of the public stats row.

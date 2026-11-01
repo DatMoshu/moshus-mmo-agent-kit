@@ -196,10 +196,20 @@ pub fn apply_level(ctx: &ReducerContext, who: Identity) {
 /// On a kill: XP (level-ups respect `player_mods.level_cap`), gold and a chance of a healing item.
 /// Returns true when the monster died.
 pub fn damage_monster(ctx: &ReducerContext, who: Identity, id: u64, dmg: i32) -> Result<bool, String> {
+    damage_monster_as(ctx, who, id, dmg, COMBAT_MELEE)
+}
+
+/// `damage_monster` with the combat event's kind (COMBAT_SPELL, or a game's own kind).
+pub fn damage_monster_as(ctx: &ReducerContext, who: Identity, id: u64, dmg: i32, kind: u8) -> Result<bool, String> {
     let mon = ctx.db.monster().id().find(id).ok_or("no such monster")?;
     let stats = ctx.db.player_stats().identity().find(who).ok_or("no stats")?;
     let tick = current_tick(ctx);
-    if mon.hp > dmg {
+    let killed = mon.hp <= dmg;
+    combat_event(ctx, CombatEvent {
+        id: 0, map_id: mon.map_id, x: mon.x, y: mon.y, src_player: Some(who), src_monster: 0, dst_player: None,
+        dst_monster: id, amount: dmg.min(mon.hp), kind, flags: if killed { COMBAT_F_KILL } else { 0 }, tick,
+    });
+    if !killed {
         wake(ctx, id);
         let b = behaviour_of(ctx, mon.kind);
         alert_pack(ctx, &mon, &b, who, tick);
@@ -230,8 +240,19 @@ pub fn damage_monster(ctx: &ReducerContext, who: Identity, id: u64, dmg: i32) ->
 }
 
 pub fn hurt_player(ctx: &ReducerContext, who: Identity, dmg: i32, tick: u64) {
+    hurt_player_by(ctx, who, dmg, tick, 0, COMBAT_OTHER);
+}
+
+/// `hurt_player` from monster `src_monster` (0 = no monster) with the combat event's kind.
+pub fn hurt_player_by(ctx: &ReducerContext, who: Identity, dmg: i32, tick: u64, src_monster: u64, kind: u8) {
     let Some(s) = ctx.db.player_stats().identity().find(who) else { return };
     let dmg = (dmg - mods_of(ctx, who).armour).max(1);
+    if let Some(t) = ctx.db.entity_transform().identity().find(who) {
+        combat_event(ctx, CombatEvent {
+            id: 0, map_id: t.map_id, x: t.x, y: t.y, src_player: None, src_monster, dst_player: Some(who),
+            dst_monster: 0, amount: dmg.min(s.hp), kind, flags: if s.hp > dmg { 0 } else { COMBAT_F_DEATH }, tick,
+        });
+    }
     if let Some(c) = ctx.db.player_combat().identity().find(who) {
         ctx.db.player_combat().identity().update(PlayerCombat { last_hurt_tick: tick, ..c });
     }
@@ -350,7 +371,7 @@ pub fn monster_pass(ctx: &ReducerContext, tick: u64, occ: &mut Occupancy, seeded
                     Some((who, pt)) => {
                         alert_pack(ctx, &mon, &b, who, tick);
                         let hit = |ctx: &ReducerContext| {
-                            hurt_player(ctx, who, roll(ctx.random(), kind.dmg_min, kind.dmg_max), tick);
+                            hurt_player_by(ctx, who, roll(ctx.random(), kind.dmg_min, kind.dmg_max), tick, mon.id, COMBAT_MELEE);
                             tick + kind.attack_ticks.max(1) as u64
                         };
                         match decide(&b, here, pt, mon.hp, mon.max_hp, silenced, feared) {
@@ -531,4 +552,13 @@ pub fn op_clear_monsters(ctx: &ReducerContext) -> Result<(), String> {
         remove_monster(ctx, id);
     }
     Ok(())
+}
+
+/// Record a combat event for floating numbers (games call it for heals and their own effects); keeps the
+/// last COMBAT_KEEP rows (one delete per insert, bounded).
+pub fn combat_event(ctx: &ReducerContext, ev: CombatEvent) {
+    let row = ctx.db.combat_event().insert(ev);
+    if row.id > COMBAT_KEEP {
+        ctx.db.combat_event().id().delete(row.id - COMBAT_KEEP);
+    }
 }

@@ -25,14 +25,26 @@ A game's own module (`server/src/<game>/`) builds on the core without editing it
 - `player_mods` (public table, one optional row per player): `dmg_bonus` (added to melee), `armour`
   (subtracted from damage taken, minimum 1), `level_cap` (0 = none; XP keeps accruing but automatic
   level-ups stop at the cap; raise it and call `combat::apply_level` to promote).
-- `combat::damage_monster(ctx, who, monster_id, dmg)` — damage with kill credit (spells, traps).
+- `combat::damage_monster(ctx, who, monster_id, dmg)` — damage with kill credit (spells, traps);
+  `damage_monster_as(.., kind)` tags the combat event (`COMBAT_SPELL`, or a game kind from 16 up).
 - `combat::spawn_monster(ctx, map, x, y, kind)` / `combat::move_monster(ctx, id, x, y)` — summons, knock-back, scripted encounters (caller checks the tile).
-- `combat::hurt_player`, `movement::place` (teleport/map change with AOI bookkeeping), `combat::mods_of`.
+- `combat::hurt_player` / `hurt_player_by(.., src_monster, kind)`, `combat::combat_event` (record a heal or
+  effect yourself), `chat::deliver(ctx, from, to, channel, target_name, text)` (party / system lines into
+  a player's private `my_chat`), `movement::place` (teleport/map change with AOI bookkeeping), `combat::mods_of`.
 - `combat::set_status(ctx, monster_id, ai::STATUS_*, ticks)` / `combat::clear_statuses` — timed monster
   statuses for spells: `STATUS_SLEEP` (skips turns, damage wakes it), `STATUS_CONFUSE` (fights the nearest
   other monster), `STATUS_SILENCE` (no ranged attacks), `STATUS_FEAR` (runs away). The public
   `monster_status` table lets clients draw them. `combat::behaviour_of(kind)` reads a kind's behaviour
   (games keep their own per-kind flags in the high 16 bits of `flags`, e.g. "undead").
+
+### Client-facing data the core publishes (for UIs)
+
+| Data | Where | Notes |
+|---|---|---|
+| XP for the next level | public `level_xp {level, xp, max_hp}` (levels 1..100) | next = `level_xp[player_stats.level + 1].xp`; a game's `level_cap` still applies |
+| Chat channel | public `chat_channel {id, channel}` side table of `chat_message` | no row = world (1); `say_in(channel, text)` with 0 local / 1 world; `say(text)` = world |
+| Whispers, party, system lines | private `chat_direct` via the `my_chat` view | `whisper(to_name, text)` (sender gets a copy, `target_name` = recipient); games call `chat::deliver`; channel 2 party, 3 system, 4 whisper; last 50 per reader |
+| Damage numbers | public `combat_event` (last 256; index on `map_id`) | src/dst player identity or monster id, `amount` actually dealt, `kind` 0 melee / 1 spell / 2 heal / 3 other, `flags` 1 killed a monster / 2 player died, `tick` |
 
 ### Monster behaviour (data-driven, `core/ai.rs`)
 
