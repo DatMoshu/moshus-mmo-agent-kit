@@ -3,7 +3,8 @@
 
 The core (server/src/core, the Godot client's core/net/render/ui/scenes, tools/shard, docs/SHARD_CORE.md and
 docs/VOXEL_TABLE.md) lives in the kit (templates/server/rust-shard, templates/client/godot-shard, tools/shard,
-docs/). A game repo copies it verbatim and records kit commit + sha256 per file in CORE_VENDOR.json.
+docs/). A game repo copies it verbatim and records kit commit + sha256 per file in CORE_VENDOR.json (text hashed with
+LF line endings, so CRLF checkouts pass --check).
 Change core behaviour in the kit (where Meadowmere tests it), then re-vendor; game code never lives in a
 vendored path.
 
@@ -44,7 +45,13 @@ def _files(base: Path) -> list[Path]:
 
 
 def _sha(p: Path) -> str:
-    return hashlib.sha256(p.read_bytes()).hexdigest()
+    """sha256 of the file with text line endings normalised (CRLF -> LF), so a Windows checkout with
+    core.autocrlf=true hashes the same as the LF files in git. Binary files (a NUL in the first 8 KiB) are hashed
+    as they are."""
+    data = p.read_bytes()
+    if b"\0" not in data[:8192]:
+        data = data.replace(b"\r\n", b"\n")
+    return hashlib.sha256(data).hexdigest()
 
 
 def vendor(kit: Path) -> int:

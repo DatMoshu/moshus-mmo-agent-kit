@@ -19,6 +19,12 @@ static func make_source(args: Dictionary) -> TileSource:
 	return ds
 
 
+## The game's own HUD (a Hud subclass overriding Hud.FACADE; see docs/SHARD_CORE.md "UI hooks"), or null for the
+## core HUD. Called once from main._ready, before the first renderer and extend().
+static func make_hud(_main: Node) -> Hud:
+	return null
+
+
 ## Extra per-game UI/logic attached to the main scene (none for the template). Called once from _ready.
 static func extend(_main: Node) -> void:
 	pass

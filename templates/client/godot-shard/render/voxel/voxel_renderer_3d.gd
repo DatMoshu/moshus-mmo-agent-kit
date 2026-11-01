@@ -5,7 +5,7 @@
 ## Players and NPCs are camera-facing billboards (2-frame animation where the tile list has pairs).
 ## Reads only MapViewState + TileSource, like every MapRenderer; it never touches networking or game state.
 ##
-## Keys while active: backslash grid, F5 tilt-shift, F6 curvature, F7 AO, F8 line of sight, F9 true EGA black,
+## Keys while active: Shift+F4 grid, F5 tilt-shift, F6 curvature, F7 AO, F8 line of sight, F9 true EGA black,
 ## F10 variation, F11 shore foam, F12 haze + town base, [ and ] camera pitch (35-50 deg).
 ## Options can also be preset with configure() / --voxel k=v,... (see OPTION_DEFAULTS):
 ##   vary   deterministic height/colour variation (amounts in the voxel table)
@@ -19,7 +19,7 @@
 ##   packsprites  billboards use the active tileset pack (on; off = always the default art)
 ##   packcol      voxel terrain colours are sampled from the active pack (off = the default art's colours, unless
 ##                the pack's manifest says voxel_colour "sample"); colours snap to the 16-colour voxel table
-## (F4 is the core's tileset key: main.gd cycles packs; the grid toggle moved to backslash.)
+## (plain F4 is the core's tileset key: main.gd cycles packs; the grid toggle is Shift+F4.)
 class_name VoxelRenderer3D
 extends MapRenderer
 
@@ -223,7 +223,7 @@ func configure(o: Dictionary) -> void:
 
 
 func describe() -> String:
-	return ("3D voxel  \\ grid:%s F5 tilt:%s F6 curve:%s F7 ao:%s F8 los:%s F9 black:%s F10 vary:%s F11 foam:%s "
+	return ("3D voxel  Shift+F4 grid:%s F5 tilt:%s F6 curve:%s F7 ao:%s F8 los:%s F9 black:%s F10 vary:%s F11 foam:%s "
 		+ "F12 haze:%s  [ ] pitch %d  res %d") % [
 		_on(opts["grid"]), _on(opts["tilt"]), _on(opts["curve"]), _on(opts["ao"]), _on(opts["los"]), _on(opts["black"]),
 		_on(opts["vary"]), _on(opts["foam"]), _on(opts["fog"]), int(opts["pitch"]), int(opts["res"])]
@@ -251,7 +251,9 @@ func _apply_opts() -> void:
 func _unhandled_input(ev: InputEvent) -> void:
 	if not (ev is InputEventKey and ev.pressed and not ev.echo):
 		return
-	var flip := {KEY_BACKSLASH: "grid", KEY_F5: "tilt", KEY_F6: "curve", KEY_F7: "ao", KEY_F8: "los", KEY_F9: "black",
+	if ev.keycode == KEY_F4 and not ev.shift_pressed:
+		return # plain F4 is main.gd's tileset cycle
+	var flip := {KEY_F4: "grid", KEY_F5: "tilt", KEY_F6: "curve", KEY_F7: "ao", KEY_F8: "los", KEY_F9: "black",
 		KEY_F10: "vary", KEY_F11: "foam", KEY_F12: "fog"}
 	if flip.has(ev.keycode):
 		opts[flip[ev.keycode]] = not opts[flip[ev.keycode]]

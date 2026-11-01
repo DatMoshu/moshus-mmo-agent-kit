@@ -87,6 +87,7 @@ func _on_connected(identity: PackedByteArray, token: String) -> void:
 		"SELECT * FROM map_exit",
 		"SELECT * FROM npc_meta",
 		"SELECT * FROM chat_message",
+		"SELECT * FROM chat_channel",
 		"SELECT * FROM player_stats",
 		"SELECT * FROM monster_kind",
 		"SELECT * FROM item_kind",
@@ -126,6 +127,11 @@ func send_move(dir: Vector2i) -> void:
 ## Gameplay intents. Results arrive on `action_result` (the server is the only authority).
 func say(text: String) -> void:
 	_call("say", client.reducers.say(text))
+
+
+## Say on a channel: 0 local (nearby), 1 world.
+func say_in(channel: int, text: String) -> void:
+	_call("say_in", client.reducers.say_in(channel, text))
 
 
 func attack(monster_id: int) -> void:
@@ -217,6 +223,12 @@ func chat_lines(n: int = 8) -> Array:
 	var rows: Array = client.db.chat_message.iter()
 	rows.sort_custom(func(a, b): return a.id < b.id)
 	return rows.slice(maxi(0, rows.size() - n))
+
+
+## Channel of a chat_message row id (side table chat_channel): 0 local, 1 world (no row = world).
+func chat_channel(msg_id: int) -> int:
+	var row = client.db.chat_channel.id.find(msg_id)
+	return int(row.channel) if row else 1
 
 
 func map_infos() -> Array:

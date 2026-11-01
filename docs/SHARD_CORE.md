@@ -145,8 +145,10 @@ func refresh_atlas() -> void                  # re-read TileSource.view_atlas*()
   bevels, bumps and `dh` rules (< 1/4 tile) are ignored, and on the wrapping overworld it returns the copy
   nearest the camera focus (unwrapped coordinates; wrap with `posmod` if needed).
 
-The HUD is replaceable: `main.set_hud(h: Hud)` (call it from `Game.extend(main)`) frees the default HUD and
-installs `h`, keeps its visibility, reconnects the three signals (`chat_submitted`, `talk_submitted`,
+The HUD is replaceable. **Hook:** `static func make_hud(main: Node) -> Hud` in `client/game/game.gd`
+(optional; return null, or leave it out, for the core HUD) is called once in `main._ready` before the first
+renderer and `Game.extend`; main looks it up dynamically, so a game.gd written before the hook still compiles.
+At run time `main.set_hud(h: Hud)` swaps HUDs: it frees the current one and installs `h`, keeps its visibility, reconnects the three signals (`chat_submitted`, `talk_submitted`,
 `talk_closed`) and emits `main.hud_changed(h)`. The replacement `extends Hud`, does **not** call
 `super._ready()` (so the default widgets are never built) and overrides every method in `Hud.FACADE`:
 `is_typing() -> bool`, `open_chat()`, `close_inputs()`, `toggle_help()`, `toast(text, seconds := 2.5)`,
@@ -161,7 +163,8 @@ in both renderers at run time. Core files: `render/tileset_pack.gd` (`TilesetPac
 building), `render/tilesets.gd` (`Tilesets.discover`), `TileSource` (active pack, game-specific packs) and
 `scenes/main.gd` (switching, keys, setting).
 
-**Player side.** F4 / Shift+F4 cycle the packs (a toast shows name and credit; the HUD status line shows the
+**Player side.** F4 cycles the packs (Shift+F4 is the 3D renderer's grid toggle; there is no previous-pack
+key, a game UI can call `cycle_tileset(-1)`) (a toast shows name and credit; the HUD status line shows the
 active pack). The choice is saved as `render/tileset` in `user://settings.cfg` (load-modify-save, other keys
 kept). `--tileset ID` picks the start pack (overrides the setting); `--tileset-dir DIR` adds a folder of packs
 besides `user://tilesets/` (one sub-folder per pack: `user://tilesets/<id>/tileset.json` + images). Folders
@@ -216,14 +219,14 @@ grid): game code and the voxel profile table keep their meaning whatever pack is
 
 **API** on main: `set_tileset(id, persist := true) -> bool` (false for an unknown id), `cycle_tileset(step := 1,
 persist := true) -> String`, `tileset_list() -> Array[Dictionary]` (`{id, name, platform, credit, licence, url,
-builtin, dir, cell, mapped, animated, voxel_colour}`), `tileset_id`, signal `tileset_changed(id)`. The setting is never saved
+builtin, dir, cell, mapped, animated, voxel_colour, active}`), `tileset_id() -> String`, signal `tileset_changed(id)`. The setting is never saved
 in `--autopilot`, `--bench` or `--tileset-check` runs.
 
 **Check.** `python tools/shard/tileset_check.py --project CLIENT [--renderer 2d|3d|both] [--shots DIR] -- <source
 flags>` writes synthetic packs (generated coloured squares, safe to share: 16 px identity, 32 px table with an
 animation and fallback, 14x16 pad with EGA snapping, plus two folders that must be refused) and runs the
 client offline with `--tileset-check --tileset-dir DIR --tileset-expect IDS`: every pack must build a 256-tile
-atlas, become the renderers' atlas, render, and F4 / Shift+F4 must cycle all packs in order and wrap; with a
+atlas, become the renderers' atlas, render, and `cycle_tileset(1)` / `cycle_tileset(-1)` (F4) must cycle all packs in order and wrap; with a
 display each pack's frame must differ. The same run checks the UI hooks: for screen offsets (0,0), (200,-120)
 and (-150,90) the focus must project to the offset centre and `screen_to_world` must invert `world_to_screen`
 (2D at height 0.5, the point drawn at p; 3D at height 0, skipping points out of line of sight). `tileset_check.py write DIR` only writes the packs.

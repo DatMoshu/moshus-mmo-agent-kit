@@ -24,8 +24,8 @@ const HELP := """Controls
   T                   talk to the nearest adjacent townsperson
   Enter               chat (Enter sends, Esc cancels)
   Tab / F3            switch 2D / 3D view
-  F4 / Shift+F4       next / previous tileset (art pack)
-  \\ F5..F12, [ ]     3D view toggles and camera pitch (listed on the status line)
+  F4                  next tileset (art pack)
+  Shift+F4, F5..F12, [ ]  3D view toggles and camera pitch (listed on the status line)
   F1                  show / hide this help
 Walk off a town's edge to leave it; step on a moongate to travel."""
 
