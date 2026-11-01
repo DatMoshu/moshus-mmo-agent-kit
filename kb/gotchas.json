@@ -414,5 +414,132 @@
   "tags": [],
   "origin": "field-experience",
   "visibility": "public"
+ },
+ {
+  "title": "New column refused on 2.13 even with a default",
+  "fix": "On a live world put new fields in a side table keyed by the same id (player_ext). New tables publish fine.",
+  "symptom": "publish refused when appending a column to an existing table, with or without a default",
+  "cause": "2.13 automatic migration did not add columns to existing tables",
+  "area": "migration",
+  "severity": "high",
+  "versions": "2.13",
+  "evidence": "field report (live project)",
+  "tags": [
+   "schema",
+   "migration"
+  ],
+  "origin": "field-experience",
+  "visibility": "public"
+ },
+ {
+  "title": "Defaulted new column disconnects every client (2.14.0)",
+  "fix": "Appending a field with #[default(v)] is accepted and existing rows get the default, but the publish plan warns 'All clients will be disconnected due to breaking schema changes'. Prefer a side table on a live world; never put #[default] on pk/unique/auto_inc.",
+  "symptom": "all clients drop after publish; or publish refused with 'Adding a column ... requires a default value annotation'",
+  "cause": "an appended column is a breaking schema change for connected clients; without #[default] there is no value for existing rows",
+  "area": "migration",
+  "severity": "high",
+  "versions": "2.14.0",
+  "evidence": "verified locally on 2.14.0 standalone (in-memory), 2026-11-01; scratch module, not in repo",
+  "tags": [
+   "schema",
+   "migration"
+  ],
+  "origin": "field-experience",
+  "visibility": "public"
+ },
+ {
+  "title": "RLS refuses nested IN subqueries",
+  "fix": "Write client_visibility_filter SQL as a single-table WHERE or a JOIN, or better use a private table plus a #[view].",
+  "symptom": "publish fails: 'failed to create row-level security ... Unsupported expression: id IN (SELECT ...)'",
+  "cause": "RLS filter SQL does not support subqueries",
+  "area": "security",
+  "severity": "medium",
+  "versions": "2.10.1 (field report), 2.14.0 (verified)",
+  "evidence": "verified locally on 2.14.0 standalone (in-memory), 2026-11-01; scratch module, not in repo; 2.10.1 from a field report",
+  "tags": [
+   "rls",
+   "visibility"
+  ],
+  "origin": "field-experience",
+  "visibility": "public"
+ },
+ {
+  "title": "JOIN-based RLS breaks client JOIN subscriptions",
+  "fix": "Do not combine a JOIN-based client_visibility_filter with client JOIN subscriptions on the same table. Expose per-player rows through a #[view] (ctx.sender()) instead.",
+  "symptom": "subscribe fails: 'Invalid number of tables in subscription: 3' (2.14.0); live JOIN subscriptions stopped working (2.10.1)",
+  "cause": "the RLS rewrite adds the filter's JOIN to the client's JOIN",
+  "area": "subscriptions",
+  "severity": "high",
+  "versions": "2.10.1 (field report), 2.14.0 (verified)",
+  "evidence": "verified locally on 2.14.0 standalone (in-memory), 2026-11-01; scratch module, not in repo; 2.10.1 from a field report",
+  "tags": [
+   "rls",
+   "subscriptions"
+  ],
+  "origin": "field-experience",
+  "visibility": "public"
+ },
+ {
+  "title": "RLS is unstable in 2.14",
+  "fix": "client_visibility_filter and Filter only exist with the spacetimedb crate feature 'unstable' and are doc-hidden. Treat RLS as unstable; prefer private tables plus views. In a local test the filter was enforced for other identities, while the publishing identity still saw all rows, so test RLS with a second, non-owner identity.",
+  "symptom": "compile error: client_visibility_filter / Filter not found",
+  "cause": "feature-gated, unstable API",
+  "area": "security",
+  "severity": "medium",
+  "versions": "2.14.0",
+  "evidence": "spacetimedb 2.14.0 crate source (cfg(feature = \"unstable\")); verified locally on 2.14.0 standalone (in-memory), 2026-11-01; scratch module, not in repo",
+  "tags": [
+   "rls",
+   "visibility"
+  ],
+  "origin": "curated",
+  "visibility": "public"
+ },
+ {
+  "title": "JOIN subscriptions need indexed join columns",
+  "fix": "Add #[index(btree)] (or unique/primary key) on both join columns before subscribing with a JOIN.",
+  "symptom": "subscribe fails: 'Subscriptions require indexes on join columns'",
+  "cause": "subscription JOINs are index joins",
+  "area": "subscriptions",
+  "severity": "medium",
+  "versions": "2.14.0",
+  "evidence": "verified locally on 2.14.0 standalone (in-memory), 2026-11-01; scratch module, not in repo",
+  "tags": [
+   "subscriptions"
+  ],
+  "origin": "curated",
+  "visibility": "public"
+ },
+ {
+  "title": "Public reducer that can end every session",
+  "fix": "Never expose module_update / kick_all / reset_world style reducers to every client. Gate with require_admin(ctx)? or an operator role (recipes/operator-role.md); keep destructive actions admin-only and log the caller.",
+  "symptom": "any player can disconnect or reset the whole world",
+  "cause": "an ops convenience reducer shipped without an authority check",
+  "area": "security",
+  "severity": "critical",
+  "versions": "2.x",
+  "evidence": "field report (live project)",
+  "tags": [
+   "security",
+   "ops"
+  ],
+  "origin": "field-experience",
+  "visibility": "public"
+ },
+ {
+  "title": "UTF-8 BOM breaks JSON receipts",
+  "fix": "Read JSON with encoding='utf-8-sig' (or strip a leading \\ufeff); write JSON without a BOM. Windows PowerShell 5.1 'Set-Content -Encoding utf8' adds one; use [IO.File]::WriteAllText or PowerShell 7 utf8NoBOM.",
+  "symptom": "JSONDecodeError: Unexpected UTF-8 BOM",
+  "cause": "a receipt written by another tool started with EF BB BF",
+  "area": "ops",
+  "severity": "medium",
+  "versions": "any",
+  "evidence": "field report (hosted run); tools/kit.py read_json",
+  "tags": [
+   "ops",
+   "windows"
+  ],
+  "origin": "field-experience",
+  "visibility": "public"
  }
 ]

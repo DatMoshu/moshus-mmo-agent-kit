@@ -78,15 +78,16 @@
  },
  {
   "subject": "architecture",
-  "statement": "Row-level security / client-visibility filters let a module restrict which rows a given identity can see in subscriptions; combine with private tables for hidden information.",
-  "confidence": "DOCUMENTED",
-  "evidence": "docs how-to/row-level-security",
+  "statement": "Row-level security (client_visibility_filter) lets a module restrict which rows an identity sees in subscriptions. In 2.14.0 it is behind the crate's 'unstable' feature; nested IN subqueries are refused and JOIN-based filters break client JOIN subscriptions. Prefer private tables plus views for hidden information.",
+  "confidence": "LOCAL",
+  "evidence": "docs how-to/row-level-security; verified locally on 2.14.0 standalone (in-memory), 2026-11-01; scratch module, not in repo",
   "tags": [
-   "security"
+   "security",
+   "rls"
   ],
   "visibility": "public",
   "origin": "curated",
-  "as_of": "2026-10-30"
+  "as_of": "2026-11-01"
  },
  {
   "subject": "architecture",
@@ -610,5 +611,18 @@
   "visibility": "public",
   "origin": "field-experience",
   "as_of": "2026-10-30"
+ },
+ {
+  "subject": "migration",
+  "statement": "In 2.14.0 a new table publishes without disconnecting clients; appending a #[default] column to an existing table is accepted but disconnects all clients; a column without a default is refused.",
+  "confidence": "LOCAL",
+  "evidence": "verified locally on 2.14.0 standalone (in-memory), 2026-11-01; scratch module, not in repo",
+  "tags": [
+   "migration",
+   "schema"
+  ],
+  "visibility": "public",
+  "origin": "field-experience",
+  "as_of": "2026-11-01"
  }
 ]

@@ -17,6 +17,9 @@ The reference implementation is `templates/server/rust-single/src/lib.rs`.
   source.
 - R7. Admission (if any) is checked in `client_connected` **and** in every player reducer.
 - R8. IDC receivers allow-list sender database identities, including in `client_connected`.
+- R31. No public reducer may end every session, wipe or reset the world, or trigger a module update (`module_update`,
+  `kick_all`, `reset_world`, ...) for any caller. Gate it with `require_admin(ctx)?` (or `require_operator(ctx)?` from
+  `recipes/operator-role.md` for delegated, non-destructive ops) and log who called it.
 
 ## Determinism
 
@@ -35,6 +38,13 @@ The reference implementation is `templates/server/rust-single/src/lib.rs`.
 - R16. Spatial tables carry AOI cell columns with a composite btree index.
 - R17. Seed data comes from idempotent `ensure_*` reducers, not only `init` (which runs once).
 - R18. Prefer additive schema changes. Destructive changes follow `skills/stdb-migration`.
+- R29. On a world with players, new fields go in a **side table** keyed by the same id, not as a new column on an
+  existing table. 2.13 refused new columns even with a default (field report). 2.14.0 accepts an appended
+  `#[default]` column but disconnects every client (verified). New tables publish without a disconnect.
+- R30. Prefer private tables plus `#[view]`s over `#[client_visibility_filter]` row-level security. In 2.14.0 RLS
+  needs the crate's `unstable` feature, nested `IN (SELECT ...)` filters are refused at publish, and a JOIN-based filter
+  makes client JOIN subscriptions on that table fail (verified). 2.10.1 had the same nested-`IN` refusal and broke live
+  JOIN subscriptions (field report).
 
 ## Reducers
 

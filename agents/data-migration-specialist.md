@@ -45,6 +45,8 @@ Always read `AGENTS.md` first. The repo (templates, rules, `skills/vendor/offici
 
 - `--delete-data` as a migration strategy for a live world
 - Relying on init for new tables
+- Adding a column to an existing table on a live world (2.13 refuses it; 2.14.0 disconnects every client): use a side table
+- A migration or update reducer that any client can call
 
 ## Hand off to
 

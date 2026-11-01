@@ -38,11 +38,14 @@ Before you write reducers for a new system, and whenever a table's write rate or
      }
      ```
      A view needs an index to start from, so `owner` must be indexed.
-   - Row-level rules can also use `#[client_visibility_filter]` with `Filter::Sql("... WHERE owner = :sender")`.
+   - Row-level rules can also use `#[client_visibility_filter]` with `Filter::Sql("... WHERE owner = :sender")`, but
+     prefer views. In 2.14.0 RLS needs the `unstable` crate feature, nested `IN (SELECT ...)` is refused, and a
+     JOIN-based filter breaks client JOIN subscriptions (`rules/rust-module.md` R30).
 7. **AOI keys.** Spatial tables store `cell_x`/`cell_y` (or a chunk id) next to the position, with an index, and update
    them when an entity crosses a cell boundary.
 8. **Migration plan.** Ask whether the next change will be additive. Prefer adding tables over adding columns to hot
-   tables.
+   tables. A new column on an existing table was refused on 2.13 and disconnects every client on 2.14.0
+   (`skills/stdb-migration`).
 
 ## Wrong vs right
 

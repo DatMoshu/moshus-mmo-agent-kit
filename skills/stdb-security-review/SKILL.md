@@ -12,6 +12,7 @@ Run `python tools/kit.py check` first. Then go through the list. Record findings
 
 - [ ] Every reducer derives the actor from `ctx.sender()`. No identity or player-id arguments are used for authorization.
 - [ ] Admin reducers call `require_admin` first. Service reducers call `require_service` first.
+- [ ] No reducer that any client can call can end every session, reset the world or trigger a module update (R31).
 - [ ] Scheduled reducers check `ctx.sender() == ctx.database_identity()`.
 - [ ] IDC receivers allow-list sender database identities.
 - [ ] Clients send **intent** (input, target id), never outcomes (new position, damage dealt, item granted).
@@ -19,7 +20,9 @@ Run `python tools/kit.py check` first. Then go through the list. Record findings
 ## Visibility
 
 - [ ] List the `public` tables. Every row of each must be fine for every client, including other players' rows.
-- [ ] Per-player data comes through views or `client_visibility_filter` rules, which rely on an index.
+- [ ] Per-player data comes through private tables plus `#[view]`s, which rely on an index. Treat
+      `client_visibility_filter` (RLS) as a last resort: in 2.14.0 it needs the `unstable` crate feature, refuses nested
+      `IN (SELECT ...)`, and a JOIN-based filter breaks client JOIN subscriptions on that table (R30).
 - [ ] No secrets (emails, provider ids, IPs, tokens, admin notes) in public tables or event payloads.
 
 ## Inputs
@@ -42,6 +45,14 @@ Run `python tools/kit.py check` first. Then go through the list. Record findings
 - [ ] Hosted servers expose only HTTPS/WSS behind a reverse proxy. The admin path is not public.
 - [ ] A backup restore was rehearsed in the last month.
 
+## Severity and rounds
+
+Tag findings with the severities in `rules/review-gates.md`: **P1** (authority hole, leak, data loss, secret),
+**P2** (real defect or a missing required check), **P3** (docs, wording and evidence nits). List every finding in the
+first pass. Re-review checks only the P1/P2 fixes, and the review ends after 3 rounds at most. P3 items are batched
+into one follow-up and never block a merge or a playtest.
+
 ## Exit
 
-Ship with no open high-severity findings. Medium findings each get an owner and a date.
+Ship with no open P1 findings. P2 findings are fixed or each get an owner and a date before external exposure. P3
+findings go in the batched follow-up.

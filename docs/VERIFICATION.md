@@ -156,3 +156,35 @@ Each snippet in `recipes/snippets/*.rs` was appended to a scratch copy of `rust-
 | `idempotent.rs` | Compiled. Calling `grant_purchase` twice with the same request id applied once. |
 | `chat.rs` | Compiled. With two SDK clients, the second client received the first's message, and a second `say` within 0.5 s was rejected with "slow down". |
 | `operator.rs` | Compiled. With `set_admission_open` switched to `require_operator`, the sidecar (its own token, not the publisher's) ran `--guard --red-level 0 --red-ticks 1`. Before `grant_operator` it got "operator only"; after it, "admission closed", and `admission_open` became false. This also verifies the sidecar guard success path. |
+
+## 2026-11-01: schema-change and RLS behaviour (local 2.14.0)
+
+Scratch module (`spacetimedb = "=2.14.0"`, feature `unstable` for RLS) published to an in-memory 2.14.0 standalone
+server. The module is not in the repo.
+
+| Check | Result |
+|---|---|
+| Append `#[default(5)] b: u32` to a table with a row | **Accepted.** The existing row got `b = 5`. The publish plan warned "All clients will be disconnected due to breaking schema changes". |
+| Append `c: u32` without a default | **Refused:** "Adding a column c to table thing requires a default value annotation". |
+| Add a new side table | **Accepted**, with no disconnect warning. |
+| RLS filter with `id IN (SELECT id FROM owner WHERE identity = :sender)` | **Refused** at publish: "Unsupported expression". |
+| RLS filter written as a JOIN on `owner` | Accepted. A non-owner (anonymous) subscriber to `SELECT * FROM thing` got 0 rows. The publishing identity got all rows. |
+| Client JOIN subscription on the RLS table (non-owner) | **Failed:** "Invalid number of tables in subscription: 3". The same JOIN subscription worked without RLS. |
+| JOIN subscription on an unindexed join column | **Failed:** "Subscriptions require indexes on join columns". |
+| `client_visibility_filter` / `Filter` | Present only with crate feature `unstable` (crate source). |
+
+**Not reproduced here:** the 2.13 refusal of defaulted new columns, and the 2.10.1 RLS behaviour. Both come from field
+reports and are labelled that way in `kb/` and `skills/stdb-migration`.
+
+## 2026-11-01: retryable runners (Linux, local 2.14.0)
+
+| Check | Result |
+|---|---|
+| `read_json` on a file starting with a UTF-8 BOM | Parsed. Plain `utf-8` raised "Unexpected UTF-8 BOM". |
+| `loadtest --bots 10 --duration 3` with a BOM-prefixed `budgets.json` | **PASS** |
+| `publish` twice to the same database (`KIT_WASM`) | Created, then updated. Both exited 0. |
+| `publish` to a closed port | Retried 2 times with backoff, then exited 1 with the connection error. |
+| `smoke` | **PASS**. Against a closed port: ping retried, then "SMOKE FAIL (server unreachable)". |
+| `retry` helper | Retried a transient error until it succeeded. A non-transient error and an HTTP 404 were not retried. |
+
+**Not run:** these runner changes on Windows.
