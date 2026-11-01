@@ -270,6 +270,21 @@ def _order_insensitive(text: str) -> list[str]:
     return sorted(re.sub(r"\[([^\[\]]*)\]", sort_list, line) for line in text.splitlines())
 
 
+def ensure_godot_import(g: str) -> None:
+    """Run `godot --headless --import` once if the project was never imported.
+
+    A fresh clone has no .godot/global_script_class_cache.cfg, so scripts run with -s (tools/codegen.gd) cannot
+    resolve the SDK's class_names (SpacetimePlugin, SpacetimeCodegen, ...) and fail to parse. Raises if the
+    import does not produce the cache, so the failure names the cause instead of a GDScript parse error."""
+    cache = GODOT_TEMPLATE / ".godot" / "global_script_class_cache.cfg"
+    if cache.exists():
+        return
+    say("Godot project not imported yet; running godot --headless --import once")
+    run([g, "--headless", "--path", str(GODOT_TEMPLATE), "--import"], check=False, capture=True)
+    if not cache.exists():
+        raise SystemExit(f"godot --import did not create {cache}; run it by hand: {g} --headless --path {GODOT_TEMPLATE} --import")
+
+
 def cmd_bindings(args) -> int:
     module = ROOT / dev(args, "module")
     rc = 0
@@ -293,6 +308,7 @@ def cmd_bindings(args) -> int:
     tmp = ROOT / ".kit"
     tmp.mkdir(exist_ok=True)
     (tmp / "schema.json").write_text(schema, encoding="utf-8")
+    ensure_godot_import(g)  # codegen.gd uses the SDK's class_names, which only resolve after an import
     rc |= run([g, "--headless", "--path", str(GODOT_TEMPLATE), "-s", "res://tools/codegen.gd", "--",
                "--schema", str(tmp / "schema.json")], check=False).returncode
     run([g, "--headless", "--path", str(GODOT_TEMPLATE), "--import"], check=False, capture=True)
@@ -384,8 +400,7 @@ def godot_smoke(url: str, db: str) -> bool:
     if not g:
         say("GODOT not set; cannot run the Godot smoke")
         return False
-    if not (GODOT_TEMPLATE / ".godot").exists():
-        run([g, "--headless", "--path", str(GODOT_TEMPLATE), "--import"], check=False, capture=True)
+    ensure_godot_import(g)
     base = [g, "--headless", "--path", str(GODOT_TEMPLATE), "--", "--autopilot", "--url", url, "--db", db, "--seconds", "8"]
     say("starting two headless Godot clients")
     # Log to files, not pipes: the SDK is chatty and a full pipe (4 KB on Windows) would stall

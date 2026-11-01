@@ -15,6 +15,7 @@ The environment was the SpacetimeDB 2.14.0 standalone server and CLI (release bu
 | Publish (fresh, then schema change with `--wipe`, then hot update) | `python tools/kit.py publish` | OK |
 | TS bindings | `spacetime generate --lang typescript` | OK; bot harness typechecks (`tsc --noEmit`) |
 | Godot bindings | `templates/client/godot/tools/codegen.gd` headless from `/v1/database/<db>/schema?version=10` | 22 files generated |
+| Godot bindings on a fresh clone | `kit.py bindings` runs `godot --headless --import` first when `.godot/global_script_class_cache.cfg` is missing (without it codegen.gd fails: `Could not find type "SpacetimeDBPluginConfig"`) | reproduced, then fixed: cache created, codegen exit 0 (Godot 4.7.2) |
 | Two-player smoke (TS SDK 2.14) | `python tools/kit.py smoke` | **PASS** (A moved +x and B saw it; B moved -y and A saw it; reducer p95 about 3 ms) |
 | Two-player smoke (Godot 4.6.3 + flametime SDK) | `python tools/kit.py smoke --godot` | **PASS** (both headless clients saw the other move) |
 | Load gate, 100 bots x 10 s at 20 Hz | `python tools/kit.py loadtest --bots 100 --duration 10` | **PASS**: 100/100 ready, 0 errors, p95 about 33 ms, p99 about 63 ms, avg tick lateness about 0.1 ms, level 0, about 1,700 row updates per bot per second |

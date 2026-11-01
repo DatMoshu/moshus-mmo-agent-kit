@@ -1,5 +1,6 @@
 ## Headless bindings generator for the vendored GDScript SDK (no editor UI needed).
-##   godot --headless --path . --import
+##   godot --headless --path . --import   # required once: class_names below only resolve after an import
+##   (tools/kit.py bindings runs the import automatically when .godot/global_script_class_cache.cfg is missing)
 ##   godot --headless --path . -s res://tools/codegen.gd -- --schema <schema.json> [--module mmo]
 ## Get the schema with:  GET <server>/v1/database/<db>/schema?version=10  (tools/kit.py bindings does this).
 extends SceneTree
