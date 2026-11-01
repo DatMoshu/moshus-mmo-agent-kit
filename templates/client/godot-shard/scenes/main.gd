@@ -1,5 +1,7 @@
 ## Shard scene (core; identical in the kit's godot-shard template and in every game built on it).
 ## WASD/arrow keys move; F attack, G pick up, H potion, T talk, Enter chat, F1 help (ui/hud.gd HELP).
+## A game can remap input without editing this file: `key_hook` sees each key press first, `move_hook`
+## rewrites the walking direction, `wasd_enabled = false` frees W/A/S/D for letter commands (see below).
 ## Tiles, sprites and NPC dialogue come from the game's TileSource (Game.make_source in client/game/game.gd:
 ## a world document, or a game's own reader for the player's install); the server only sends
 ## positions, stats and ids.
@@ -28,6 +30,15 @@ var _peer_first := {} # identity hex -> Vector2 first seen
 var _peer_moved := {} # identity hex -> true once seen moving
 var _started_ms := 0
 var _auto_dir := Vector2i(1, 0)
+## Input hooks for a game's own key scheme (set from Game.setup / the game's node; all optional).
+## key_hook: Callable(ev: InputEventKey) -> bool, called for every key press before the core keys
+##   (Tab/F1/Enter/Esc/F/G/H/T); return true to consume it.
+## move_hook: Callable(dir: Vector2i) -> Vector2i, called every frame with the default direction (arrows,
+##   plus WASD when wasd_enabled); return the direction to walk (Vector2i.ZERO stands still).
+## Neither runs while a HUD text box has focus or in autopilot/bench modes.
+var key_hook := Callable()
+var move_hook := Callable()
+var wasd_enabled := true
 var _auto_sign := 1
 var src: TileSource # the game adapter's client half, from Game.make_source (client/game/game.gd)
 var renderer: MapRenderer
@@ -140,6 +151,9 @@ func _update_hud() -> void:
 
 func _unhandled_input(ev: InputEvent) -> void:
 	if not (ev is InputEventKey and ev.pressed and not ev.echo):
+		return
+	if key_hook.is_valid() and not hud.is_typing() and bool(key_hook.call(ev)):
+		get_viewport().set_input_as_handled()
 		return
 	var handled := true
 	match ev.keycode:
@@ -314,15 +328,24 @@ func _process(_delta: float) -> void:
 	elif hud.is_typing():
 		Net.send_move(Vector2i.ZERO)
 	else:
-		var dir := Vector2i(
-			int(Input.is_action_pressed("ui_right")) - int(Input.is_action_pressed("ui_left")),
-			int(Input.is_action_pressed("ui_down")) - int(Input.is_action_pressed("ui_up")))
+		Net.send_move(move_dir())
+	renderer.render(_view_state())
+
+
+## The walking direction from the keyboard this frame: arrows (ui_*), WASD when wasd_enabled, then move_hook.
+func move_dir() -> Vector2i:
+	var dir := Vector2i(
+		int(Input.is_action_pressed("ui_right")) - int(Input.is_action_pressed("ui_left")),
+		int(Input.is_action_pressed("ui_down")) - int(Input.is_action_pressed("ui_up")))
+	if wasd_enabled:
 		if Input.is_physical_key_pressed(KEY_D): dir.x = 1
 		if Input.is_physical_key_pressed(KEY_A): dir.x = -1
 		if Input.is_physical_key_pressed(KEY_S): dir.y = 1
 		if Input.is_physical_key_pressed(KEY_W): dir.y = -1
-		Net.send_move(dir)
-	renderer.render(_view_state())
+	if move_hook.is_valid():
+		var d = move_hook.call(dir)
+		dir = d if d is Vector2i else Vector2i.ZERO
+	return dir
 
 
 func _autopilot_check() -> void:

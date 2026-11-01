@@ -116,6 +116,11 @@ UI/logic once, after the first renderer is up), `process(main) -> bool` (each jo
 drove it, so the core skips its input/autopilot), `bench_start(src) -> Vector2` (where `--bench` walks),
 `decorate_view(main, st)` (add game markers such as spell fields to the frame's view), `title()`. Source loaders print one `SOURCE source=… root=…` line (the test harnesses read it).
 
+Input remapping (a game's own key scheme, set from `extend(main)`): `main.key_hook: Callable(InputEventKey) -> bool`
+sees every key press before the core keys (return true to consume it); `main.move_hook: Callable(Vector2i) ->
+Vector2i` rewrites the frame's walking direction; `main.wasd_enabled = false` leaves only the arrows so W/A/S/D
+can be commands; `main.move_dir()` is the resulting direction. Neither hook runs while a HUD text box has focus.
+
 ## 3. Rules for an adapter whose data is commercial
 
 * The repo ships **code only**. The adapter reads the player's install at run time; derived output goes to
