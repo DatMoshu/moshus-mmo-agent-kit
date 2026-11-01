@@ -17,6 +17,7 @@ const MonsterKind = Types.MonsterKind
 const Npc = Types.Npc
 const NpcMeta = Types.NpcMeta
 const Player = Types.Player
+const PlayerMods = Types.PlayerMods
 const PlayerStats = Types.PlayerStats
 const Portal = Types.Portal
 const TickHealth = Types.TickHealth

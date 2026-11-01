@@ -24,6 +24,13 @@ static func extend(_main: Node) -> void:
 	pass
 
 
+## Called every frame while joined, before the core's own autopilot/input. Return true when the game
+## drove this frame itself (its own --route, a modal panel); the core then skips movement input and
+## its built-in routes (rendering and the HUD still run).
+static func process(_main: Node) -> bool:
+	return false
+
+
 ## Where --bench starts its overworld loop: the middle of map 0.
 static func bench_start(src: TileSource) -> Vector2:
 	return Vector2(src.map_size(0)) / 2.0

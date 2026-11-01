@@ -411,3 +411,16 @@ pub struct InventoryItem {
     pub kind: u16,
     pub qty: u32,
 }
+
+/// Public: optional per-player modifiers a game layer writes (equipment, buffs, a level cap).
+/// No row = no modifiers. The core reads it in combat: `dmg_bonus` adds to melee damage, `armour`
+/// is subtracted from damage taken (never below 1), and `level_cap` (0 = none) stops automatic
+/// level-ups so a game can grant levels itself (e.g. a king who promotes you).
+#[table(accessor = player_mods, public)]
+pub struct PlayerMods {
+    #[primary_key]
+    pub identity: Identity,
+    pub dmg_bonus: i32,
+    pub armour: i32,
+    pub level_cap: u32,
+}

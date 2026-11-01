@@ -66,16 +66,50 @@ pub fn attack(ctx: &ReducerContext, target_id: u64) -> Result<(), String> {
     }
     ctx.db.player_combat().identity().update(PlayerCombat { last_attack_tick: tick.max(1), ..cmb });
     let (lo, hi) = player_damage(stats.level);
-    let dmg = roll(ctx.random(), lo, hi);
+    let dmg = roll(ctx.random(), lo, hi) + mods_of(ctx, me).dmg_bonus;
+    damage_monster(ctx, me, target_id, dmg.max(1))?;
+    Ok(())
+}
+
+/// The caller's modifiers (all zero when the game wrote none).
+pub fn mods_of(ctx: &ReducerContext, who: Identity) -> PlayerMods {
+    ctx.db.player_mods().identity().find(who).unwrap_or(PlayerMods { identity: who, dmg_bonus: 0, armour: 0, level_cap: 0 })
+}
+
+/// The level `xp` earns for `who`, held at their `level_cap` when the game set one.
+pub fn capped_level(ctx: &ReducerContext, who: Identity, xp: u32) -> u32 {
+    let cap = mods_of(ctx, who).level_cap;
+    let lv = level_for_xp(xp);
+    if cap == 0 { lv } else { lv.min(cap) }
+}
+
+/// Re-derive `who`'s level and max HP from XP and the current cap (full heal on a level-up).
+/// Games call this after raising `player_mods.level_cap`.
+pub fn apply_level(ctx: &ReducerContext, who: Identity) {
+    let Some(s) = ctx.db.player_stats().identity().find(who) else { return };
+    let level = capped_level(ctx, who, s.xp).max(s.level);
+    if level != s.level {
+        let max_hp = max_hp_for_level(level);
+        ctx.db.player_stats().identity().update(PlayerStats { level, max_hp, hp: max_hp, ..s });
+    }
+}
+
+/// Deal `dmg` to monster `id` on behalf of player `who` (melee, spells, anything a game adds).
+/// On a kill: XP (level-ups respect `player_mods.level_cap`), gold and a chance of a healing item.
+/// Returns true when the monster died.
+pub fn damage_monster(ctx: &ReducerContext, who: Identity, id: u64, dmg: i32) -> Result<bool, String> {
+    let mon = ctx.db.monster().id().find(id).ok_or("no such monster")?;
+    let stats = ctx.db.player_stats().identity().find(who).ok_or("no stats")?;
+    let tick = current_tick(ctx);
     if mon.hp > dmg {
         ctx.db.monster().id().update(Monster { hp: mon.hp - dmg, ..mon });
-        return Ok(());
+        return Ok(false);
     }
     // Kill: XP, level, loot on the monster's tile.
     let kind = ctx.db.monster_kind().kind().find(mon.kind);
     let (xp_gain, gmin, gmax) = kind.as_ref().map(|k| (k.xp, k.gold_min, k.gold_max)).unwrap_or((5, 1, 5));
     let xp = stats.xp + xp_gain;
-    let level = level_for_xp(xp);
+    let level = capped_level(ctx, who, xp).max(stats.level);
     let max_hp = max_hp_for_level(level);
     let hp = if level > stats.level { max_hp } else { stats.hp };
     ctx.db.player_stats().identity().update(PlayerStats { xp, level, max_hp, hp, kills: stats.kills + 1, ..stats });
@@ -91,11 +125,12 @@ pub fn attack(ctx: &ReducerContext, target_id: u64) -> Result<(), String> {
         }
     }
     remove_monster(ctx, mon.id);
-    Ok(())
+    Ok(true)
 }
 
-fn hurt_player(ctx: &ReducerContext, who: Identity, dmg: i32, tick: u64) {
+pub fn hurt_player(ctx: &ReducerContext, who: Identity, dmg: i32, tick: u64) {
     let Some(s) = ctx.db.player_stats().identity().find(who) else { return };
+    let dmg = (dmg - mods_of(ctx, who).armour).max(1);
     if let Some(c) = ctx.db.player_combat().identity().find(who) {
         ctx.db.player_combat().identity().update(PlayerCombat { last_hurt_tick: tick, ..c });
     }

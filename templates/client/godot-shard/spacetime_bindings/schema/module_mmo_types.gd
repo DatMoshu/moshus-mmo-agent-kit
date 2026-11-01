@@ -13,6 +13,7 @@ const MonsterKind = preload('res://spacetime_bindings/schema/types/mmo_monster_k
 const Npc = preload('res://spacetime_bindings/schema/types/mmo_npc.gd')
 const NpcMeta = preload('res://spacetime_bindings/schema/types/mmo_npc_meta.gd')
 const Player = preload('res://spacetime_bindings/schema/types/mmo_player.gd')
+const PlayerMods = preload('res://spacetime_bindings/schema/types/mmo_player_mods.gd')
 const PlayerStats = preload('res://spacetime_bindings/schema/types/mmo_player_stats.gd')
 const Portal = preload('res://spacetime_bindings/schema/types/mmo_portal.gd')
 const TickHealth = preload('res://spacetime_bindings/schema/types/mmo_tick_health.gd')

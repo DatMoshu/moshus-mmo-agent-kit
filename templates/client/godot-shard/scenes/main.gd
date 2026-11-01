@@ -297,6 +297,8 @@ func _process(_delta: float) -> void:
 	_maybe_toggle()
 	if _capturing:
 		pass # screenshots: hold still, keep rendering
+	elif Game.process(self):
+		pass # the game drove this frame (its own route or panel)
 	elif _args.has("autopilot") and _route == "portal":
 		_route_portal()
 	elif _args.has("autopilot") and _route in ["play", "resume"]:
