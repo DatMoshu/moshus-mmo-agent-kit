@@ -30,6 +30,7 @@ Always read `AGENTS.md` first. The repo (templates, rules, `skills/vendor/offici
 2. Each milestone: player-visible outcome, acceptance evidence (commands + expected results), stop/rollback rule, owner.
 3. Gate playtests on: smoke PASS, security review done, load test at 2x the expected players PASS, restore drill done.
 4. Accept work only with evidence attached; 'should work' is not evidence.
+5. Enforce the review cap in `rules/review-gates.md`: at most 3 rounds, only P1/P2 findings block, and P3 nits are batched into one follow-up. If round 3 still has a blocker, decide: merge with the blocker split out, or split the change.
 
 ## Done means
 
@@ -39,6 +40,7 @@ Always read `AGENTS.md` first. The repo (templates, rules, `skills/vendor/offici
 
 - Milestones defined by tasks instead of outcomes
 - Playtest without a security review
+- A change stuck in review for more than 3 rounds
 
 ## Hand off to
 

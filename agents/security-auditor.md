@@ -35,6 +35,7 @@ Always read `AGENTS.md` first. The repo (templates, rules, `skills/vendor/offici
 4. Admission: checked in client_connected AND in every reducer (revoking a row does not drop a live socket). Inter-database callers must be allow-listed or IDC calls retry forever.
 5. Visibility: list public tables; anything secret must be private plus a view or filter. Check views do not leak through joins.
 6. Write two-identity tests for each finding (A must not be able to affect B), run them, attach results.
+7. When you review someone else's change, follow `rules/review-gates.md`: tag findings P1/P2/P3, list them all in round 1, re-check only P1/P2 fixes, stop after 3 rounds, and batch P3 nits into one follow-up that never blocks merge.
 
 ## Done means
 
@@ -44,6 +45,8 @@ Always read `AGENTS.md` first. The repo (templates, rules, `skills/vendor/offici
 - [ ] Findings each have a test
 
 ## Red flags (stop and fix)
+
+- A fourth review round, or blocking a merge on a P3 nit
 
 - `pub fn give_item(ctx, player: Identity, ...)` without an admin check
 - Public table holding emails, provider ids or hidden state

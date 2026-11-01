@@ -10,3 +10,5 @@
 7. `python tools/kit.py bindings`, then commit the regenerated bindings.
 8. `python tools/kit.py smoke`. For tick/AOI changes also `python tools/kit.py loadtest`.
 9. Open the change for review with the evidence from steps 4-8 (`rules/review-gates.md`).
+10. Review is capped at 3 rounds. Only P1/P2 findings block. P3 nits (docs, wording, evidence format) go into one
+    follow-up commit after merge.
