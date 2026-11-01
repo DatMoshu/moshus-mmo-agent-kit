@@ -283,7 +283,8 @@ func _on_connected(identity_hex: String) -> void:
 	if _args.has("autopilot"):
 		var d: PackedStringArray = String(_args.get("dir", "1,0")).split(",")
 		_auto_dir = Vector2i(int(d[0]), int(d[1]))
-		Net.send_move(_auto_dir)
+		if _route != "resume": # the reconnect check must stand still where it logged in
+			Net.send_move(_auto_dir)
 
 
 ## Tell the tile source about every map the server announced (it loads each from local data).
