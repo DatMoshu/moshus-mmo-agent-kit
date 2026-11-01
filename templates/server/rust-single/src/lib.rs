@@ -243,7 +243,11 @@ pub fn join(ctx: &ReducerContext, name: String) -> Result<(), String> {
             last_input_seq: 0,
         });
     }
-    if ctx.db.player_input().identity().find(me).is_none() {
+    // A new session restarts its intent counter at 1, so a returning player's old seq must not make
+    // set_input ignore every move of the new session as stale.
+    if let Some(i) = ctx.db.player_input().identity().find(me) {
+        ctx.db.player_input().identity().update(PlayerInput { dir_x: 0, dir_y: 0, seq: 0, ..i });
+    } else {
         ctx.db.player_input().insert(PlayerInput { identity: me, dir_x: 0, dir_y: 0, seq: 0 });
     }
     Ok(())
