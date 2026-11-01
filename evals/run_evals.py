@@ -21,7 +21,7 @@ failures: list[str] = []
 
 
 def hallucinations() -> None:
-    expected = json.loads((EV / "hallucinations" / "expected.json").read_text(encoding="utf-8"))
+    expected = json.loads((EV / "hallucinations" / "expected.json").read_text(encoding="utf-8-sig"))
     for rel, ids in expected.items():
         f = EV / "hallucinations" / rel
         out = subprocess.run([sys.executable, str(ROOT / "tools" / "kit.py"), "check", str(f)],
@@ -38,7 +38,7 @@ def frontmatter() -> None:
     files = [p for p in (ROOT / "agents").glob("*.md") if p.name.lower() != "readme.md"]
     files += list((ROOT / "skills").glob("stdb-*/SKILL.md"))
     for f in files:
-        m = re.match(r"---\n(.*?)\n---\n", f.read_text(encoding="utf-8").replace("\r\n", "\n"), re.S)
+        m = re.match(r"---\n(.*?)\n---\n", f.read_text(encoding="utf-8-sig").replace("\r\n", "\n"), re.S)
         meta = dict(re.findall(r"^(\w+):\s*(.+)$", m.group(1), re.M)) if m else {}
         want = f.parent.name if f.name == "SKILL.md" else f.stem
         if meta.get("name") != want or not meta.get("description"):
@@ -57,7 +57,7 @@ def links() -> None:
              *ROOT.glob("docs/**/*.md"), *ROOT.glob("rules/*.md"), *ROOT.glob("recipes/*.md")]
     missing = set()
     for t in texts:
-        for p in re.findall(r"(?<![\w/.-])((?:rules|docs|recipes|evals|kb|templates|tools|skills|agents)/[A-Za-z0-9_./-]+)", t.read_text(encoding="utf-8")):
+        for p in re.findall(r"(?<![\w/.-])((?:rules|docs|recipes|evals|kb|templates|tools|skills|agents)/[A-Za-z0-9_./-]+)", t.read_text(encoding="utf-8-sig")):
             p = p.rstrip(".,):`")
             if "<" in p or p.startswith(PROJECT_ONLY) or "*" in p:
                 continue
@@ -77,7 +77,7 @@ def main() -> int:
     print("[evals] links"); links()
     sc = EV / "scenarios.md"
     if sc.exists():
-        n = len(re.findall(r"^## ", sc.read_text(encoding="utf-8"), re.M))
+        n = len(re.findall(r"^## ", sc.read_text(encoding="utf-8-sig"), re.M))
         print(f"[evals] {n} agent scenarios in evals/scenarios.md (grade manually or with an LLM judge)")
     print(f"[evals] {'PASS' if not failures else 'FAIL: ' + ', '.join(failures)}")
     return 1 if failures else 0

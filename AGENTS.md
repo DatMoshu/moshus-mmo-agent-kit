@@ -66,6 +66,7 @@ you did not run it.
 | Changing a live schema | data-migration-specialist | stdb-migration |
 | New SpacetimeDB release | stdb-docs-librarian, live-ops-engineer | stdb-upgrade-runtime |
 | Bots, budgets, capacity | load-test-engineer | stdb-load-test, stdb-observability |
+| Scripted ops runs that flake or fail halfway | live-ops-engineer | stdb-ops-runners |
 | Global + regions, handoffs | sharding-specialist | stdb-sharding-plan |
 | Heavy AI / pathfinding / mapgen | module-engineer, procgen-engineer | stdb-sidecar |
 | Before any external playtest | security-auditor, qa-playtest-lead | stdb-security-review |

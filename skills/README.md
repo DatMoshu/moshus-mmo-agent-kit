@@ -4,7 +4,7 @@ Skills are task playbooks. Each one is a folder with a `SKILL.md` that has YAML 
 and a markdown body. Claude Code, Cursor, Codex and similar agents can load them directly. Agents in `agents/` list the
 skills they load.
 
-## Kit skills (22)
+## Kit skills (23)
 
 They are written for SpacetimeDB **2.14** (see `stdb.lock`) and come from real projects and measured load tests.
 
@@ -22,6 +22,7 @@ They are written for SpacetimeDB **2.14** (see `stdb.lock`) and come from real p
 | [`stdb-migration`](stdb-migration/SKILL.md) | Ship SpacetimeDB schema changes to a world that already has data, without wipes. Use when changing tables after players exist. |
 | [`stdb-new-game`](stdb-new-game/SKILL.md) | Scaffold a new SpacetimeDB 2.14 MMO from the kit (server module, chosen client, pinned versions, smoke test). Use when starting a project or a fresh prototype. |
 | [`stdb-observability`](stdb-observability/SKILL.md) | Add metrics, logs, health and dashboards to a SpacetimeDB world (tick_health, row counts, reducer errors, connection counts) without hurting performance. Use before playtests and for live ops. |
+| [`stdb-ops-runners`](stdb-ops-runners/SKILL.md) | Write or fix ops runners (publish, smoke, load test, backup, migration batches, deploy scripts) so they are idempotent, retry only transient failures with backoff, resume from receipts and read JSON with a BOM safely. Use when a scripted run against a SpacetimeDB server fails halfway, flakes, or needs a rerun. |
 | [`stdb-reducer-author`](stdb-reducer-author/SKILL.md) | Write correct SpacetimeDB 2.14 Rust reducers with authority checks, input validation, deterministic logic and rollback. Use for any reducer you add or change. |
 | [`stdb-schema-design`](stdb-schema-design/SKILL.md) | Design SpacetimeDB tables, keys, indexes, visibility and AOI columns for a feature before writing reducers. Use for any new system or table. |
 | [`stdb-security-review`](stdb-security-review/SKILL.md) | Audit a SpacetimeDB module and its clients for authority, visibility, input validation, abuse and secret handling before playtests and releases. Use before any external exposure. |

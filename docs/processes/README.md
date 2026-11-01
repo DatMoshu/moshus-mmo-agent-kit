@@ -14,3 +14,4 @@ humans should too.
 | [`backup-restore.md`](backup-restore.md) | proving recovery |
 | [`incident.md`](incident.md) | a live world is degraded |
 | [`parallel-agents.md`](parallel-agents.md) | several agents work on one repo at once |
+| [`ops-runners.md`](ops-runners.md) | writing or re-running any scripted job against a server |

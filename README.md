@@ -1,7 +1,7 @@
 # Moshu's MMO Agent Kit
 
 **An agent kit for building multiplayer games on [SpacetimeDB](https://spacetimedb.com).**
-It gives you 18 specialist agent roles, 22 skills, rules and gates for an AI coding agent
+It gives you 18 specialist agent roles, 23 skills, rules and gates for an AI coding agent
 (Claude Code, Codex, Cursor, Grok and others), plus a server template and client starters that
 have been run end to end, a bot harness, and a load gate. Start with two players moving in 30
 minutes, then grow the same design toward thousands of players.
@@ -15,7 +15,7 @@ minutes, then grow the same design toward thousands of players.
 |---|---|
 | `AGENTS.md`, `CLAUDE.md` | Entry points your coding agent reads first: hard rules, routing, gates |
 | `agents/` | 18 role definitions (architect, schema, reducer, sharding, netcode, client, security, load test, licence steward, ...) |
-| `skills/` | 22 kit skills (patterns, gotchas, wrong-vs-right, checklists) plus the 11 official SpacetimeDB skills vendored in `skills/vendor/official/` |
+| `skills/` | 23 kit skills (patterns, gotchas, wrong-vs-right, checklists) plus the 11 official SpacetimeDB skills vendored in `skills/vendor/official/` |
 | `rules/` | Non-negotiables and the hallucinated-API catalog used by `kit.py check` |
 | `docs/` | Decision tree, scale ladder (10 to 5,000 players), processes, verification log, licensing guide (not legal advice) |
 | `templates/server/rust-single` | A running Rust world module: admission, players, 20 Hz movement tick, AOI cells, health and degradation levels |

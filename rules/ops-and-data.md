@@ -16,3 +16,5 @@
   reports.
 - O9. **Record verification** honestly in `docs/VERIFICATION.md`: what ran, where, which version, the result. Never
   mark something verified that was not run.
+- O10. **Runners are re-runnable.** Ops scripts are idempotent, retry only transient failures with backoff, read
+  JSON with `utf-8-sig`, and keep hash-freeze evidence for releases (`docs/processes/ops-runners.md`).

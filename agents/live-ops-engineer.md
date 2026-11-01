@@ -27,6 +27,7 @@ Always read `AGENTS.md` first. The repo (templates, rules, `skills/vendor/offici
 - `skills/stdb-deploy-maincloud/SKILL.md`
 - `skills/stdb-upgrade-runtime/SKILL.md`
 - `skills/stdb-observability/SKILL.md`
+- `skills/stdb-ops-runners/SKILL.md`
 
 ## Workflow
 

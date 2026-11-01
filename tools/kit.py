@@ -21,12 +21,19 @@ Environment:
   SPACETIME_ARGS  extra global CLI args, e.g. "--root-dir .kit/root --config-path .kit/cli.toml"
   GODOT           path to a Godot 4.6.x binary (console build on Windows)
   KIT_WASM        prebuilt module .wasm to publish/generate from instead of building
+  KIT_RETRIES     retries for transient failures (default 2; 0 disables)
+  KIT_RETRY_BASE  first backoff delay in seconds (default 2; doubles each retry, with jitter)
+
+Runners are safe to re-run (see docs/processes/ops-runners.md): they retry only transient failures
+(connection refused/reset, timeouts, HTTP 429/502/503/504), never a real FAIL verdict, and read JSON
+with utf-8-sig so a UTF-8 BOM written by another tool does not break parsing.
 """
 from __future__ import annotations
 
 import argparse
 import json
 import os
+import random
 import re
 import shlex
 import shutil
@@ -36,16 +43,22 @@ import tempfile
 import sys
 import tomllib
 import time
+import urllib.error
 import urllib.request
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
-LOCK = tomllib.loads((ROOT / "stdb.lock").read_text(encoding="utf-8"))
+LOCK = tomllib.loads((ROOT / "stdb.lock").read_text(encoding="utf-8-sig"))
 BOTS = ROOT / "tools" / "loadtest" / "bots"
 GODOT_TEMPLATE = ROOT / LOCK["dev"].get("godot_client", "templates/client/godot")
 WEB_ADMIN = ROOT / LOCK["dev"].get("web_admin", "templates/client/web-admin")
 SIDECAR = ROOT / LOCK["dev"].get("sidecar", "templates/sidecar")
 IS_WIN = os.name == "nt"
+RETRIES = max(0, int(os.environ.get("KIT_RETRIES", "2")))
+RETRY_BASE = max(0.0, float(os.environ.get("KIT_RETRY_BASE", "2")))
+TRANSIENT = re.compile(r"connection (?:refused|reset|aborted|closed)|timed? ?out|temporarily unavailable|broken pipe|"
+                       r"ECONNREFUSED|ECONNRESET|ETIMEDOUT|EAI_AGAIN|error sending request|"
+                       r"\b(?:429|502|503|504)\b", re.I)
 
 
 def say(msg: str) -> None:
@@ -56,6 +69,54 @@ def run(cmd: list[str], cwd: Path | None = None, check: bool = True, capture: bo
     say("$ " + " ".join(shlex.quote(str(c)) for c in cmd) + (f"   (in {cwd})" if cwd else ""))
     return subprocess.run([str(c) for c in cmd], cwd=cwd, check=check, text=True, encoding="utf-8",
                           errors="replace", capture_output=capture, shell=False)
+
+
+class Transient(Exception):
+    """A failure worth retrying: the same step may succeed if run again unchanged."""
+
+
+def read_json(path: Path):
+    """JSON from a file, tolerating a UTF-8 BOM (PowerShell 5 `Out-File`/`Set-Content -Encoding utf8` add one)."""
+    return json.loads(Path(path).read_text(encoding="utf-8-sig"))
+
+
+def retry(what: str, fn, attempts: int | None = None):
+    """Run fn(); on a transient failure wait base * 2^n (with jitter) and run it again.
+
+    fn must be idempotent. Non-transient errors and real verdicts are returned or raised at once."""
+    tries = (RETRIES if attempts is None else attempts) + 1
+    for i in range(1, tries + 1):
+        try:
+            return fn()
+        except urllib.error.HTTPError as e:
+            if e.code not in (429, 502, 503, 504) or i == tries:
+                raise
+            err: Exception = e
+        except (Transient, urllib.error.URLError, ConnectionError, TimeoutError) as e:
+            if i == tries:
+                raise
+            err = e
+        delay = RETRY_BASE * (2 ** (i - 1)) * (0.5 + random.random() / 2)
+        say(f"{what}: transient failure ({err}); retry {i}/{tries - 1} in {delay:.1f}s")
+        time.sleep(delay)
+    raise AssertionError("unreachable")
+
+
+def http_get(url: str, timeout: float = 30) -> str:
+    def once() -> str:
+        with urllib.request.urlopen(url, timeout=timeout) as r:
+            return r.read().decode("utf-8-sig")
+    return retry(f"GET {url}", once)
+
+
+def wait_for_server(url: str) -> bool:
+    """Ping the server (GET /v1/ping) with retries; say why if it never answers."""
+    try:
+        http_get(f"{url}/v1/ping", timeout=5)
+        return True
+    except Exception as e:  # noqa: BLE001
+        say(f"server {url} did not answer /v1/ping ({e}). Start it with `python tools/kit.py server`.")
+        return False
 
 
 def which(name: str) -> str | None:
@@ -183,12 +244,23 @@ def cmd_publish(args) -> int:
     cmd = [*spacetime(), "publish", dev(args, "db"), "--server", dev(args, "url"), *module_source(module), "--yes"]
     if args.wipe:
         cmd.append("--delete-data")
-    return run(cmd, check=False).returncode
+
+    def once() -> int:
+        res = run(cmd, check=False, capture=True)
+        out = (res.stdout or "") + (res.stderr or "")
+        print(out, end="" if out.endswith("\n") else "\n")
+        if res.returncode != 0 and TRANSIENT.search(out):
+            raise Transient(f"exit {res.returncode}")
+        return res.returncode
+    # Re-publishing the same module is idempotent, so a connection blip is safe to retry.
+    try:
+        return retry("publish", once)
+    except Transient:
+        return 1
 
 
 def fetch_schema(url: str, db: str) -> str:
-    with urllib.request.urlopen(f"{url}/v1/database/{db}/schema?version=10", timeout=20) as r:
-        return r.read().decode("utf-8")
+    return http_get(f"{url}/v1/database/{db}/schema?version=10", timeout=20)
 
 
 def _order_insensitive(text: str) -> list[str]:
@@ -264,7 +336,7 @@ def bots(args_list: list[str], capture: bool = True) -> subprocess.CompletedProc
 
 def last_json(text: str) -> dict | None:
     for line in reversed(text.strip().splitlines()):
-        line = line.strip()
+        line = line.strip().lstrip("\ufeff")
         if line.startswith("{"):
             try:
                 return json.loads(line)
@@ -273,11 +345,32 @@ def last_json(text: str) -> dict | None:
     return None
 
 
+def bots_verdict(what: str, args_list: list[str]) -> tuple[dict | None, subprocess.CompletedProcess]:
+    """Run the bot harness; retry only when it produced no verdict (crash, refused connection).
+
+    A FAIL verdict is a real result and is never retried. Each run uses fresh identities, so re-runs are safe."""
+    last: list = [None]
+
+    def once():
+        res = bots(args_list)
+        last[0] = res
+        verdict = last_json(res.stdout or "")
+        if verdict is None:
+            raise Transient("no verdict from the bot harness")
+        return verdict, res
+    try:
+        return retry(what, once)
+    except Transient:
+        return None, last[0]
+
+
 def cmd_smoke(args) -> int:
     ensure_bots()
     url, db = dev(args, "url"), dev(args, "db")
-    res = bots(["--mode", "smoke", "--uri", ws_url(url), "--db", db])
-    verdict = last_json(res.stdout or "")
+    if not wait_for_server(url):
+        print("SMOKE FAIL (server unreachable)")
+        return 1
+    verdict, res = bots_verdict("smoke", ["--mode", "smoke", "--uri", ws_url(url), "--db", db])
     print(json.dumps(verdict, indent=2) if verdict else ((res.stdout or "") + (res.stderr or "")))
     ok = bool(verdict) and verdict.get("verdict") == "PASS"
     if args.godot:
@@ -320,10 +413,12 @@ def godot_smoke(url: str, db: str) -> bool:
 
 def cmd_loadtest(args) -> int:
     ensure_bots()
-    budgets = json.loads((ROOT / "tools" / "loadtest" / "budgets.json").read_text(encoding="utf-8"))
-    res = bots(["--mode", "swarm", "--uri", ws_url(dev(args, "url")), "--db", dev(args, "db"),
-                "--bots", str(args.bots), "--duration", str(args.duration)])
-    report = last_json(res.stdout or "")
+    budgets = read_json(ROOT / "tools" / "loadtest" / "budgets.json")
+    if not wait_for_server(dev(args, "url")):
+        print("LOADTEST FAIL (server unreachable)")
+        return 1
+    report, res = bots_verdict("loadtest", ["--mode", "swarm", "--uri", ws_url(dev(args, "url")), "--db", dev(args, "db"),
+                                            "--bots", str(args.bots), "--duration", str(args.duration)])
     if not report:
         print(res.stdout or "", res.stderr or "")
         print("LOADTEST FAIL (no report)")
@@ -390,7 +485,7 @@ def _scannable(text: str, suffix: str) -> str:
 
 
 def cmd_check(args) -> int:
-    catalog = json.loads((ROOT / "rules" / "hallucinations.json").read_text(encoding="utf-8"))
+    catalog = read_json(ROOT / "rules" / "hallucinations.json")
     paths = [Path(p) for p in (args.paths or ["."])]
     exts = {".rs", ".ts", ".tsx", ".js", ".cs", ".gd", ".cpp", ".h", ".md", ".toml", ".json", ".py", ".sh", ".ps1", ".yml", ".yaml"}
     skip = {"node_modules", "target", ".git", ".godot", "module_bindings", "spacetime_bindings", "vendor", "addons", ".kit", "samples", "kb"}
@@ -401,7 +496,7 @@ def cmd_check(args) -> int:
             if f.name in ("hallucinations.json", "kit.py"):
                 continue
             try:
-                text = f.read_text(encoding="utf-8", errors="ignore")
+                text = f.read_text(encoding="utf-8-sig", errors="ignore")
             except OSError:
                 continue
             text = _scannable(text, f.suffix)
@@ -442,7 +537,7 @@ def cmd_new(args) -> int:
             shutil.copy2(ROOT / f, dest / f)
     shutil.copytree(ROOT / "tools", dest / "tools", ignore=ignore)
     db = re.sub(r"[^a-z0-9-]", "-", args.name.lower())
-    lock = (dest / "stdb.lock").read_text(encoding="utf-8")
+    lock = (dest / "stdb.lock").read_text(encoding="utf-8-sig")
     lock = lock.replace('database = "mmo-dev"', f'database = "{db}-dev"').replace('module = "templates/server/rust-single"', 'module = "server"')
     lock = lock.replace("[dev]\n", "[dev]\n" + ('godot_client = "client"\n' if args.client == "godot" else "")
                         + ('web_admin = "client"\n' if args.client == "web-admin" else ""), 1)
@@ -454,7 +549,7 @@ def cmd_new(args) -> int:
     if cargo.exists():
         cargo.write_text(re.sub(r'^name = ".*"$', f'name = "{db.replace("-", "_")}_server"', cargo.read_text(encoding="utf-8"), count=1, flags=re.M), encoding="utf-8")
     if getattr(args, "sidecar", False):
-        lock = (dest / "stdb.lock").read_text(encoding="utf-8").replace("[dev]\n", '[dev]\nsidecar = "sidecar"\n', 1)
+        lock = (dest / "stdb.lock").read_text(encoding="utf-8-sig").replace("[dev]\n", '[dev]\nsidecar = "sidecar"\n', 1)
         (dest / "stdb.lock").write_text(lock, encoding="utf-8")
     say(f"created {dest}")
     if args.server == "rust-sharded":
@@ -479,8 +574,7 @@ def cmd_vendor_skills(args) -> int:
     for name in names:
         url = base.format(ref=args.ref, name=name)
         try:
-            with urllib.request.urlopen(url, timeout=30) as r:
-                body = r.read().decode("utf-8")
+            body = http_get(url)
         except Exception as e:  # noqa: BLE001
             print(f"  SKIP {name}: {e}")
             continue
@@ -495,8 +589,7 @@ def cmd_vendor_skills(args) -> int:
             print(f"  same    {name}")
     lic = "https://raw.githubusercontent.com/clockworklabs/SpacetimeDB/{ref}/codex-plugin/plugins/spacetimedb/LICENSE"
     try:
-        with urllib.request.urlopen(lic.format(ref=args.ref), timeout=30) as r:
-            (out / "LICENSE").write_text(r.read().decode("utf-8"), encoding="utf-8")
+        (out / "LICENSE").write_text(http_get(lic.format(ref=args.ref)), encoding="utf-8")
     except Exception as e:  # noqa: BLE001
         print(f"  could not refresh LICENSE ({e}); keep the existing Apache-2.0 LICENSE file")
     (out / "SOURCE.txt").write_text(
@@ -541,7 +634,7 @@ def cmd_kb_export(args) -> int:
     con = sqlite3.connect(db_path)
     total = 0
     for jf in sorted(kb.glob("*.json")):
-        rows = json.loads(jf.read_text(encoding="utf-8"))
+        rows = read_json(jf)
         if not rows:
             continue
         table = jf.stem.replace("-", "_")

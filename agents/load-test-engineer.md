@@ -25,6 +25,7 @@ Always read `AGENTS.md` first. The repo (templates, rules, `skills/vendor/offici
 - `skills/stdb-load-test/SKILL.md`
 - `skills/stdb-observability/SKILL.md`
 - `skills/stdb-aoi-subscriptions/SKILL.md`
+- `skills/stdb-ops-runners/SKILL.md`
 
 ## Workflow
 
