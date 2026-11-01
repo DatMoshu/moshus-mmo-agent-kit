@@ -22,12 +22,15 @@ minutes, then grow the same design toward thousands of players.
 | `templates/client/godot` | A Godot 4.7 client on the MIT flametime SDK behind a small `Net` seam, with a headless autopilot test |
 | `templates/server/ts-single` | The same world in TypeScript, wire-compatible with every client (verified) |
 | `templates/server/rust-sharded` | Global and region databases with 2.14 cross-database outbox handoff, plus `dev_up.py` (verified locally) |
+| `templates/server/rust-shard` | Clean-room tile-world MMO core (maps, portals, NPCs, PvE combat, items, operator seeding of a `mmo-core-world/1` document); see `docs/SHARD_CORE.md` (verified locally with the Meadowmere fixture) |
 | `templates/sidecar` | A Node helper process: world census, health-guard pattern, and a place for NPC/outbox work (verified) |
+| `templates/client/godot-shard` | Godot 4.7 client for `rust-shard`: 2D tile renderer + 3D voxel diorama, HUD/chat/talk, one `game/game.gd` hook (verified headless and under Xvfb, 2 clients, 2D and 3D) |
 | `templates/client/web-admin` | Vite + TypeScript live map and admin console (built and verified in headless Chrome) |
 | `templates/client/unity` | Thin Unity starter. The session logic is verified headlessly with .NET; the editor was not run |
 | `templates/client/unreal` | Thin Unreal C++ starter, with bindings generated and the API checked by hand. **Not compiled** |
 | `tools/kit.py` | One CLI: `doctor`, `server`, `publish`, `bindings`, `smoke`, `loadtest`, `check`, `new`, `vendor-skills`, `install-claude`, `kb-export` |
 | `tools/loadtest/bots` | A TypeScript bot swarm (SDK 2.14): smoke test, AOI-aware swarm, latency percentiles, tick health |
+| `tools/shard` | Shard tooling: `seeder.py` (world document -> seed reducers), `fixture_game.py` (Meadowmere test world + 2-client route test), `vendor_core.py` (copy the core into a game repo and verify it) |
 | `recipes/` | Copyable features with compiled, run-checked Rust snippets: AOI, inventory/trades, chat, idempotent requests, operator role, region hand-off client, invite-only playtest |
 | `evals/` | `run_evals.py` (hallucination-rule self-test, frontmatter, links) plus 10 graded agent-behaviour scenarios |
 | `kb/` | A public knowledge base of facts, gotchas, patterns, processes, decisions, versions and sources, each with confidence and evidence. Stored as JSON; `kit.py kb-export` builds a SQLite copy |
@@ -97,6 +100,7 @@ python tools/kit.py loadtest --bots 100 --duration 20     # PASS / CONCERNS / FA
 ```bash
 python tools/kit.py new my-game --dest ..    # copies server + client + tools + rules into ../my-game
 python tools/kit.py new my-mmo --server ts-single --client web-admin --sidecar   # other combinations
+python tools/kit.py new my-rpg --server rust-shard --client godot-shard          # tile-world RPG shard (docs/SHARD_CORE.md)
 ```
 
 Then point your agent at it: *"Read AGENTS.md. Add a chat channel per region, following

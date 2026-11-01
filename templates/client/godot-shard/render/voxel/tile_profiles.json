@@ -1,0 +1,14 @@
+{
+  "_doc": [
+    "Generic voxel tile table (format: docs/VOXEL_TABLE.md), used when the game's TileSource.voxel_table() is empty.",
+    "Every tile id below 64 is flat ground coloured by its own pixels; ids 64+ fall back to 'prop' (a low block).",
+    "A game replaces this with its own table (a world document's client.voxel, or its TileSource override)."
+  ],
+  "categories": {
+    "ground": {"base": 0, "ground": "#3f6a32", "side": "#5a3f24", "bevel": [1], "pixels": {"*": {"dh": 0}}},
+    "prop": {"base": 0, "ground": "#2a2622", "pixels": {"*": {"dh": 3}}}
+  },
+  "tiles": [[0, 63, "ground"]],
+  "walk": {"categories": {"ground": true, "prop": false}, "tiles": {}},
+  "sprites": {"pairs": [], "avatar": 31}
+}

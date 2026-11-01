@@ -1,0 +1,29 @@
+class_name Game
+## The game hook: the ONLY client file the core (scenes/, net/, render/, ui/, core/) asks for game-specific
+## behaviour. Each game ships its own copy. This template's runs a mmo-core-world/1 document (--world FILE,
+## e.g. the Meadowmere fixture from tools/shard/fixture_game.py). A game that reads its world some other way
+## returns its own TileSource subclass from make_source (see docs/SHARD_CORE.md).
+
+
+static func title() -> String:
+	return "MMO Shard"
+
+
+static func make_source(args: Dictionary) -> TileSource:
+	var ds := DocSource.new()
+	if ds.load_doc(String(args.get("world", ""))):
+		print("SOURCE source=%s game=%s root=%s" % [ds.source, ds.game, ds.root])
+	else:
+		push_warning(ds.error)
+		print("SOURCE source=none (%s)" % ds.error)
+	return ds
+
+
+## Extra per-game UI/logic attached to the main scene (none for the template). Called once from _ready.
+static func extend(_main: Node) -> void:
+	pass
+
+
+## Where --bench starts its overworld loop: the middle of map 0.
+static func bench_start(src: TileSource) -> Vector2:
+	return Vector2(src.map_size(0)) / 2.0

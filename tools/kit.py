@@ -227,7 +227,9 @@ def _vs_installs() -> list[str]:
 
 def cmd_server(args) -> int:
     cmd = spacetime()
-    if args.isolated:
+    if args.isolated and "--root-dir" in cmd:
+        say("SPACETIME_ARGS already sets --root-dir; using it instead of the --isolated .kit paths")
+    elif args.isolated:
         kitdir = ROOT / ".kit"
         kitdir.mkdir(exist_ok=True)
         cmd += ["--root-dir", str(kitdir / "root"), "--config-path", str(kitdir / "cli.toml")]
@@ -554,7 +556,7 @@ def cmd_new(args) -> int:
     db = re.sub(r"[^a-z0-9-]", "-", args.name.lower())
     lock = (dest / "stdb.lock").read_text(encoding="utf-8-sig")
     lock = lock.replace('database = "mmo-dev"', f'database = "{db}-dev"').replace('module = "templates/server/rust-single"', 'module = "server"')
-    lock = lock.replace("[dev]\n", "[dev]\n" + ('godot_client = "client"\n' if args.client == "godot" else "")
+    lock = lock.replace("[dev]\n", "[dev]\n" + ('godot_client = "client"\n' if args.client in ("godot", "godot-shard") else "")
                         + ('web_admin = "client"\n' if args.client == "web-admin" else ""), 1)
     (dest / "stdb.lock").write_text(lock, encoding="utf-8")
     cfg = dest / "client" / "spacetime_bindings" / "plugin_config.tres"
@@ -570,6 +572,10 @@ def cmd_new(args) -> int:
     if args.server == "rust-sharded":
         print(f"next:\n  cd {dest}\n  python tools/kit.py doctor\n  python server/scripts/dev_up.py --regions 2   # global + 2 regions, peered"
               "\n  see server/README.md for the handoff protocol and client flow")
+    elif args.server == "rust-shard":
+        print(f"next:\n  cd {dest}\n  python tools/kit.py doctor\n  python tools/kit.py server --isolated   # own terminal"
+              f"\n  python tools/shard/fixture_game.py live --publish --db {db}-dev --godot $GODOT   # publish, seed, play Meadowmere"
+              "\n  see docs/SHARD_CORE.md (world document, Game hooks, vendoring)")
     else:
         print(f"next:\n  cd {dest}\n  python tools/kit.py doctor\n  python tools/kit.py publish\n  python tools/kit.py smoke")
     if args.client in ("unity", "unreal"):
@@ -683,7 +689,7 @@ def main() -> int:
     s = common(sub.add_parser("smoke")); s.add_argument("--godot", action="store_true")
     s = common(sub.add_parser("loadtest")); s.add_argument("--bots", type=int, default=100); s.add_argument("--duration", type=int, default=20)
     s = sub.add_parser("check"); s.add_argument("paths", nargs="*")
-    s = sub.add_parser("new"); s.add_argument("name"); s.add_argument("--dest", default=".."); s.add_argument("--server", default="rust-single"); s.add_argument("--client", default="godot", choices=["godot", "web-admin", "unity", "unreal", "none"]); s.add_argument("--sidecar", action="store_true", help="also copy templates/sidecar")
+    s = sub.add_parser("new"); s.add_argument("name"); s.add_argument("--dest", default=".."); s.add_argument("--server", default="rust-single"); s.add_argument("--client", default="godot", choices=["godot", "godot-shard", "web-admin", "unity", "unreal", "none"]); s.add_argument("--sidecar", action="store_true", help="also copy templates/sidecar")
     s = sub.add_parser("vendor-skills"); s.add_argument("--ref", default="master")
     sub.add_parser("kb-export")
     s = sub.add_parser("install-claude"); s.add_argument("--dest", help="project root (default: this repo)")

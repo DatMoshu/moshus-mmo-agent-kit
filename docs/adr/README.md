@@ -14,3 +14,4 @@ The `KIT-*` records below are the decisions behind this kit itself. Your game's 
 | [KIT-004](KIT-004-licensing.md) | Kit licensing and what may be copied | accepted |
 | [KIT-005](KIT-005-pinned-versions.md) | One pinned versions file | accepted |
 | [KIT-006](KIT-006-agent-runtime-neutral.md) | Agent-runtime neutral | accepted |
+| [KIT-007](KIT-007-shard-core-vendored.md) | The shard core lives in the kit and games vendor it | accepted |

@@ -1,0 +1,3 @@
+.godot/
+spacetime_bindings/codegen_debug/
+*.tmp

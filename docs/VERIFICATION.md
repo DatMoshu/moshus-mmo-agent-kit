@@ -205,3 +205,14 @@ On Windows 11, the Godot 4.7.2 console build also passed the headless import and
 Not yet re-run with 4.7: the Windows Godot smoke (no local SpacetimeDB server on that run), `bindings --check` (GDScript codegen), and opening the
 project in the 4.7 editor. The flametime SDK states support for Godot 4.6.1+; 4.7 is not named upstream,
 so treat SDK compatibility as verified only by the smoke above.
+
+## 2026-11-01: shard templates (`rust-shard` + `godot-shard`, Linux, local 2.14.0, Godot 4.7.2)
+
+| Check | Command | Result |
+|---|---|---|
+| Scaffold | `python tools/kit.py new shardtest --server rust-shard --client godot-shard` | **PASS**: lock gets `godot_client`, `shardtest-dev`, `module = "server"`; Cargo and plugin config renamed |
+| Publish + seed + 2 clients, 3D | `python tools/shard/fixture_game.py live --publish --db shardtest-dev --godot $GODOT --renderer 3d` (in the scaffold, under Xvfb) | **PASS**: module built and published, Meadowmere seeded, both clients walked the portal route and saw each other and 3 NPCs |
+| Same, 2D | `... live --db shardtest-dev --godot $GODOT` | **PASS** |
+| In-kit run | `python tools/shard/fixture_game.py live --db fixture-dev --godot $GODOT` (uses the templates in place) | **PASS** |
+
+**Not run:** the shard templates on Windows; `bindings --check` for `godot-shard`.
