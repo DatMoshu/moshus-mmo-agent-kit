@@ -26,6 +26,7 @@ A game's own module (`server/src/<game>/`) builds on the core without editing it
   (subtracted from damage taken, minimum 1), `level_cap` (0 = none; XP keeps accruing but automatic
   level-ups stop at the cap; raise it and call `combat::apply_level` to promote).
 - `combat::damage_monster(ctx, who, monster_id, dmg)` — damage with kill credit (spells, traps).
+- `combat::spawn_monster(ctx, map, x, y, kind)` / `combat::move_monster(ctx, id, x, y)` — summons, knock-back, scripted encounters (caller checks the tile).
 - `combat::hurt_player`, `movement::place` (teleport/map change with AOI bookkeeping), `combat::mods_of`.
 - `combat::set_status(ctx, monster_id, ai::STATUS_*, ticks)` / `combat::clear_statuses` — timed monster
   statuses for spells: `STATUS_SLEEP` (skips turns, damage wakes it), `STATUS_CONFUSE` (fights the nearest

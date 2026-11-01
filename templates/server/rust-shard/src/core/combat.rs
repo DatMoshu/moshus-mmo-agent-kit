@@ -492,11 +492,9 @@ pub fn regen_pass(ctx: &ReducerContext, tick: u64) {
     }
 }
 
-/// Admin/test: put a monster of `kind` on (map, x, y). Used by the playtest harness to make
-/// fights and deaths deterministic.
-#[reducer]
-pub fn op_spawn_monster(ctx: &ReducerContext, map_id: u8, x: u16, y: u16, kind: u8) -> Result<(), String> {
-    require_admin(ctx)?;
+/// Game hook: put a monster of `kind` on tile (x, y) of `map_id` (summons, scripted encounters,
+/// test setups). Respects the monster cap; the caller checks walkability. Returns the monster id.
+pub fn spawn_monster(ctx: &ReducerContext, map_id: u8, x: i32, y: i32, kind: u8) -> Result<u64, String> {
     let k = ctx.db.monster_kind().kind().find(kind).ok_or("unknown monster kind")?;
     if map_dims(ctx, map_id).is_none() {
         return Err("unknown map".into());
@@ -504,8 +502,24 @@ pub fn op_spawn_monster(ctx: &ReducerContext, map_id: u8, x: u16, y: u16, kind: 
     if ctx.db.monster().count() as usize >= MAX_MONSTERS {
         return Err("monster cap".into());
     }
-    insert_monster(ctx, map_id, x as i32, y as i32, &k, current_tick(ctx));
+    Ok(insert_monster(ctx, map_id, x, y, &k, current_tick(ctx)))
+}
+
+/// Game hook: move monster `id` to tile (x, y) on its map (knock-back, wind, teleport). The caller
+/// checks the tile; the monster's home is kept, so it walks back within its leash.
+pub fn move_monster(ctx: &ReducerContext, id: u64, x: i32, y: i32) -> Result<(), String> {
+    let m = ctx.db.monster().id().find(id).ok_or("no such monster")?;
+    let (fx, fy) = (x as f32 + 0.5, y as f32 + 0.5);
+    ctx.db.monster().id().update(Monster { x: fx, y: fy, cell_x: cell_of(fx), cell_y: cell_of(fy), ..m });
     Ok(())
+}
+
+/// Admin/test: put a monster of `kind` on (map, x, y). Used by the playtest harness to make
+/// fights and deaths deterministic.
+#[reducer]
+pub fn op_spawn_monster(ctx: &ReducerContext, map_id: u8, x: u16, y: u16, kind: u8) -> Result<(), String> {
+    require_admin(ctx)?;
+    spawn_monster(ctx, map_id, x as i32, y as i32, kind).map(|_| ())
 }
 
 /// Admin/test: remove every live monster.
