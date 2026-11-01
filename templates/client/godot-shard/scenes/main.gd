@@ -836,6 +836,7 @@ func _view_state() -> MapViewState:
 		st.items.append({"id": g.id, "tile": ik.tile if ik else 60, "pos": Vector2(g.x + 0.5, g.y + 0.5),
 			"name": ik.name if ik else "item", "qty": g.qty})
 	st.target_id = _target
+	Game.decorate_view(self, st)
 	return st
 
 

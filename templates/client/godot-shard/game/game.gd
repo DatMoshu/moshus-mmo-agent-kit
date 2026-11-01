@@ -31,6 +31,12 @@ static func process(_main: Node) -> bool:
 	return false
 
 
+## Called after the core built each frame's view from server rows: add game-specific markers (spell effects,
+## status hints) to `st.items` / `st.monsters` names. Renderers draw whatever is there; no new renderer code.
+static func decorate_view(_main: Node, _st: MapViewState) -> void:
+	pass
+
+
 ## Where --bench starts its overworld loop: the middle of map 0.
 static func bench_start(src: TileSource) -> Vector2:
 	return Vector2(src.map_size(0)) / 2.0

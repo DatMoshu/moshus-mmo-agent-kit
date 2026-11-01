@@ -12,7 +12,7 @@ reference adapter; it ships with the core and is its test.
 | Seeding | `tools/shard/seeder.py` (validates + sends an `mmo-core-world/1` document) | `tools/<game>/<game>adapter.py` (builds the document) |
 | Client tiles/art | `client/render/tile_source.gd` (interface), `client/core/doc_source.gd` (from a document) | `client/<game>/<game>_local.gd` (reads the player's install) |
 | Client dialogue | `client/core/conversation.gd`, `client/core/keyword_talk.gd`, `client/ui/hud.gd` | a `Conversation` subclass if keywords are not enough |
-| Client glue | `client/net/`, `client/render/` (2D + 3D voxel), `client/ui/`, `client/scenes/main.gd`, `client/render/palette.gd` | `client/game/game.gd` (`Game.make_source`, `Game.extend`, `Game.process`, `Game.bench_start`) |
+| Client glue | `client/net/`, `client/render/` (2D + 3D voxel), `client/ui/`, `client/scenes/main.gd`, `client/render/palette.gd` | `client/game/game.gd` (`Game.make_source`, `Game.extend`, `Game.process`, `Game.bench_start`, `Game.decorate_view`) |
 | 3D | `client/render/voxel/*` + the generic `tile_profiles.json` | a voxel table (docs/VOXEL_TABLE.md) via `TileSource.voxel_table()` |
 | Tests | `fixture_game.py check` / `live [--godot]` | the game's own route/play checks |
 
@@ -102,7 +102,7 @@ is sent to the server (dialogue stays on the player's machine).
 `make_source(args) -> TileSource` (the template: `--world FILE` → `DocSource`), `extend(main)` (attach game
 UI/logic once, after the first renderer is up), `process(main) -> bool` (each joined frame; true = the game
 drove it, so the core skips its input/autopilot), `bench_start(src) -> Vector2` (where `--bench` walks),
-`title()`. Source loaders print one `SOURCE source=… root=…` line (the test harnesses read it).
+`decorate_view(main, st)` (add game markers such as spell fields to the frame's view), `title()`. Source loaders print one `SOURCE source=… root=…` line (the test harnesses read it).
 
 ## 3. Rules for an adapter whose data is commercial
 
