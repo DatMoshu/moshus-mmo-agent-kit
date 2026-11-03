@@ -17,7 +17,7 @@ const primary_key: StringName = &'id'
 const BSATN_TYPES: Dictionary[StringName, StringName] = {
 	"id": "U32",
 	"map_id": "U8",
-	"talk": "U8",
+	"talk": "U16",
 	"home_x": "U8",
 	"home_y": "U8"
 }

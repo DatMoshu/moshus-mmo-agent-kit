@@ -10,6 +10,7 @@
 extends Node
 
 signal session_connected(identity_hex: String)
+signal schema_rejected(reason: String)
 signal session_disconnected
 signal joined_world
 signal aoi_changed(cells: Array)
@@ -57,6 +58,24 @@ func connect_to_server(url: String = server_url, db: String = database, p_profil
 		var path := _token_path()
 		if FileAccess.file_exists(path):
 			options.token = FileAccess.get_file_as_string(path).strip_edges()
+	# Refuse mismatched old/new dialogue bindings before opening a BSATN subscription (D11).
+	var request := HTTPRequest.new()
+	request.timeout = 10.0
+	add_child(request)
+	var schema_url := server_url.replace("wss://", "https://").replace("ws://", "http://")
+	var err := request.request(schema_url.trim_suffix("/") + "/v1/database/" + database.uri_encode() + "/schema?version=10")
+	if err != OK:
+		request.queue_free()
+		schema_rejected.emit("Dialogue schema unavailable")
+		return
+	var response: Array = await request.request_completed
+	request.queue_free()
+	var expected: StringName = MmoNpcMeta.BSATN_TYPES[&"talk"]
+	var schema = JSON.parse_string(PackedByteArray(response[3]).get_string_from_utf8())
+	if response[0] != HTTPRequest.RESULT_SUCCESS or response[1] != 200 or not DialogueSchema.matches(schema, expected):
+		print("SCHEMA_REJECT dialogue expected=%s" % expected)
+		schema_rejected.emit("Dialogue schema and client bindings differ; use a matching build")
+		return
 	client.connect_db(server_url, database, options)
 
 

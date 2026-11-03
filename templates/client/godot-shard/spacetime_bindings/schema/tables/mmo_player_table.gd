@@ -2,8 +2,8 @@
 # FILE WILL NOT BE SAVED. MODIFY TABLES IN YOUR MODULE SOURCE CODE INSTEAD.
 class_name MmoPlayerTable extends _ModuleTable
 
-var identity: MmoPlayerIdentityUniqueIndex
 var name: MmoPlayerNameUniqueIndex
+var identity: MmoPlayerIdentityUniqueIndex
 
 func _init() -> void:
 	set_meta("table_name", "player")
@@ -13,8 +13,8 @@ func _init() -> void:
 static func create(p_local_db: LocalDatabase) -> MmoPlayerTable:
 	var table: MmoPlayerTable = MmoPlayerTable.new()
 	table._db = p_local_db
-	table.identity = MmoPlayerIdentityUniqueIndex.create(p_local_db)
 	table.name = MmoPlayerNameUniqueIndex.create(p_local_db)
+	table.identity = MmoPlayerIdentityUniqueIndex.create(p_local_db)
 	return table
 
 func iter() -> Array[MmoPlayer]:

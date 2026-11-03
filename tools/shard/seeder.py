@@ -68,6 +68,17 @@ def validate(doc: dict) -> None:
         if m["id"] in ids:
             raise SystemExit(f"duplicate map id {m['id']}")
         ids.add(m["id"])
+    # Preflight every native dialogue ID before seed_begin can clear existing content.
+    # bool is an int subclass in Python; type(...) is int deliberately excludes it.
+    counts: dict[int, int] = {}
+    for npc in doc.get("npcs", []):
+        talk = npc.get("talk", 0)
+        if type(talk) is not int or not 0 <= talk <= 65535:
+            raise SystemExit("npc talk must be an integer in 0..65535")
+        mid = npc["map_id"]
+        counts[mid] = counts.get(mid, 0) + 1
+        if counts[mid] > 256:
+            raise SystemExit("at most 256 NPC slots per map")
     for p in doc.get("portals", []):
         if p["from_map"] not in ids or p["to_map"] not in ids:
             raise SystemExit(f"portal {p['id']} references an unknown map")

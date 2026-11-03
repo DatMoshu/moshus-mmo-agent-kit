@@ -185,7 +185,7 @@ pub fn seed_npcs(
     xs: Vec<u8>,
     ys: Vec<u8>,
     wander: Vec<u8>,
-    talk: Vec<u8>,
+    talk: Vec<u16>,
 ) -> Result<(), String> {
     require_admin(ctx)?;
     let n = slots.len();

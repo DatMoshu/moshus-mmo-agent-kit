@@ -105,6 +105,7 @@ func _ready() -> void:
 	if _args.has("bench"):
 		_bench_start()
 		return
+	Net.schema_rejected.connect(func(reason: String): hud.toast(reason))
 	Net.session_connected.connect(_on_connected)
 	Net.session_disconnected.connect(func(): _disconnects += 1)
 	Net.connect_to_server(_args.get("url", "http://127.0.0.1:3000"), _args.get("db", "mmo-dev"), _args.get("profile", ""))

@@ -223,7 +223,7 @@ pub struct NpcMeta {
     pub id: u32,
     #[index(btree)]
     pub map_id: u8,
-    pub talk: u8,
+    pub talk: u16,
     pub home_x: u8,
     pub home_y: u8,
 }

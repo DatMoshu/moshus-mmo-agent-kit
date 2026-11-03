@@ -272,23 +272,24 @@ def _order_insensitive(text: str) -> list[str]:
     return sorted(re.sub(r"\[([^\[\]]*)\]", sort_list, line) for line in text.splitlines())
 
 
-def ensure_godot_import(g: str) -> None:
+def ensure_godot_import(g: str, project: Path = GODOT_TEMPLATE) -> None:
     """Run `godot --headless --import` once if the project was never imported.
 
     A fresh clone has no .godot/global_script_class_cache.cfg, so scripts run with -s (tools/codegen.gd) cannot
     resolve the SDK's class_names (SpacetimePlugin, SpacetimeCodegen, ...) and fail to parse. Raises if the
     import does not produce the cache, so the failure names the cause instead of a GDScript parse error."""
-    cache = GODOT_TEMPLATE / ".godot" / "global_script_class_cache.cfg"
+    cache = project / ".godot" / "global_script_class_cache.cfg"
     if cache.exists():
         return
     say("Godot project not imported yet; running godot --headless --import once")
-    run([g, "--headless", "--path", str(GODOT_TEMPLATE), "--import"], check=False, capture=True)
+    run([g, "--headless", "--path", str(project), "--import"], check=False, capture=True)
     if not cache.exists():
-        raise SystemExit(f"godot --import did not create {cache}; run it by hand: {g} --headless --path {GODOT_TEMPLATE} --import")
+        raise SystemExit(f"godot --import did not create {cache}; run it by hand: {g} --headless --path {project} --import")
 
 
 def cmd_bindings(args) -> int:
     module = ROOT / dev(args, "module")
+    godot_template = ROOT / args.godot_client if getattr(args, "godot_client", None) else GODOT_TEMPLATE
     rc = 0
     # TypeScript (bots, web admin, sidecar) straight from the module source.
     for out in [BOTS / "src" / "module_bindings", WEB_ADMIN / "src" / "module_bindings", SIDECAR / "src" / "module_bindings"]:
@@ -296,7 +297,7 @@ def cmd_bindings(args) -> int:
             rc |= run([*spacetime(), "generate", "--lang", "typescript", "--out-dir", str(out),
                        *module_source(module), "--yes"], check=False).returncode
     # Godot (flametime SDK) from the published schema; needs a running server with the module.
-    if not (GODOT_TEMPLATE / "project.godot").exists():
+    if not (godot_template / "project.godot").exists():
         return rc  # no Godot client in this project
     g = godot()
     if not g:
@@ -310,15 +311,15 @@ def cmd_bindings(args) -> int:
     tmp = ROOT / ".kit"
     tmp.mkdir(exist_ok=True)
     (tmp / "schema.json").write_text(schema, encoding="utf-8")
-    ensure_godot_import(g)  # codegen.gd uses the SDK's class_names, which only resolve after an import
-    rc |= run([g, "--headless", "--path", str(GODOT_TEMPLATE), "-s", "res://tools/codegen.gd", "--",
+    ensure_godot_import(g, godot_template)  # codegen.gd uses the SDK's class_names, which only resolve after an import
+    rc |= run([g, "--headless", "--path", str(godot_template), "-s", "res://tools/codegen.gd", "--",
                "--schema", str(tmp / "schema.json")], check=False).returncode
-    run([g, "--headless", "--path", str(GODOT_TEMPLATE), "--import"], check=False, capture=True)
+    run([g, "--headless", "--path", str(godot_template), "--import"], check=False, capture=True)
     if args.check:
-        st = run(["git", "status", "--porcelain", "--", str(GODOT_TEMPLATE / "spacetime_bindings")], cwd=ROOT, capture=True, check=False)
+        st = run(["git", "status", "--porcelain", "--", str(godot_template / "spacetime_bindings")], cwd=ROOT, capture=True, check=False)
         drift = []
-        names = run(["git", "diff", "--name-only", "--", str(GODOT_TEMPLATE / "spacetime_bindings")], cwd=ROOT, capture=True, check=False).stdout
-        names += run(["git", "ls-files", "--others", "--exclude-standard", "--full-name", "--", str(GODOT_TEMPLATE / "spacetime_bindings")],
+        names = run(["git", "diff", "--name-only", "--", str(godot_template / "spacetime_bindings")], cwd=ROOT, capture=True, check=False).stdout
+        names += run(["git", "ls-files", "--others", "--exclude-standard", "--full-name", "--", str(godot_template / "spacetime_bindings")],
                      cwd=ROOT, capture=True, check=False).stdout
         for line in names.splitlines():
             rel = line.strip()
@@ -685,7 +686,7 @@ def main() -> int:
     sub.add_parser("doctor")
     s = common(sub.add_parser("server")); s.add_argument("--isolated", action="store_true", help="keep CLI config + data under .kit/")
     s = common(sub.add_parser("publish")); s.add_argument("--module"); s.add_argument("--wipe", action="store_true", help="delete data (dev only)")
-    s = common(sub.add_parser("bindings")); s.add_argument("--module"); s.add_argument("--check", action="store_true")
+    s = common(sub.add_parser("bindings")); s.add_argument("--module"); s.add_argument("--check", action="store_true"); s.add_argument("--godot-client", help="Godot project to regenerate (default: dev client from stdb.lock)")
     s = common(sub.add_parser("smoke")); s.add_argument("--godot", action="store_true")
     s = common(sub.add_parser("loadtest")); s.add_argument("--bots", type=int, default=100); s.add_argument("--duration", type=int, default=20)
     s = sub.add_parser("check"); s.add_argument("paths", nargs="*")

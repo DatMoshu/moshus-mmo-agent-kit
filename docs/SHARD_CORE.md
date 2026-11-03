@@ -77,7 +77,7 @@ inventory) are kept, and a player whose saved tile is no longer walkable is move
 | `maps` | `[{id, key, width, height, tiles[w*h], exit_at_edge}]` | sizes are multiples of 32 (chunking); `key` is what the client's TileSource loads |
 | `map_exits` | `[{map_id, to_map, x, y}]` | walking off the edge of `map_id` (needs `exit_at_edge`) puts you at `to_map:x,y` |
 | `portals` | `[{id, name, from_map, x, y, to_map, to_x, to_y}]` | stepping on `from_map:x,y` teleports (towns, moongates, ladders) |
-| `npcs` | `[{map_id, slot, tile, x, y, wander, talk}]` | server-simulated; `talk` is an opaque per-map dialogue reference for the client (0 = none) |
+| `npcs` | `[{map_id, slot, tile, x, y, wander, talk}]` | server-simulated; `talk` is an opaque per-map u16 dialogue reference (0..65535; 0 = none), validated before any seed mutation |
 | `monster_kinds` | `[{kind, name, tile, hp, dmg_min, dmg_max, step_ticks, attack_ticks, aggro, xp, gold_min, gold_max, ai?}]` | `ai` = optional `{flee_hp_pct, range, keep_dist, pack, flags}` (see "Monster behaviour") |
 | `spawn_rules` | `[{id, map_id, max_alive, kinds[], min_dist, max_dist}]` | monsters spawn around players, outside safe zones |
 | `safe_zones` | `[{id, map_id, x, y, r}]` | no spawning, no combat (Chebyshev radius) |

@@ -122,9 +122,9 @@ func seed_monster_kind(kind: int, name: String, tile: int, hp: int, dmg_min: int
 ## 3. xs: PackedByteArray [br]
 ## 4. ys: PackedByteArray [br]
 ## 5. wander: PackedByteArray [br]
-## 6. talk: PackedByteArray [br]
-func seed_npcs(map_id: int, slots: PackedByteArray, tiles: PackedByteArray, xs: PackedByteArray, ys: PackedByteArray, wander: PackedByteArray, talk: PackedByteArray) -> SpacetimeDBReducerCall:
-	return _client.call_reducer('seed_npcs', [map_id, slots, tiles, xs, ys, wander, talk], [&'U8', &'vec_U8', &'vec_U8', &'vec_U8', &'vec_U8', &'vec_U8', &'vec_U8'])
+## 6. talk: Array[int] [br]
+func seed_npcs(map_id: int, slots: PackedByteArray, tiles: PackedByteArray, xs: PackedByteArray, ys: PackedByteArray, wander: PackedByteArray, talk: Array[int]) -> SpacetimeDBReducerCall:
+	return _client.call_reducer('seed_npcs', [map_id, slots, tiles, xs, ys, wander, talk], [&'U8', &'vec_U8', &'vec_U8', &'vec_U8', &'vec_U8', &'vec_U8', &'vec_U16'])
 
 ## 0. id: int [br]
 ## 1. from_map: int [br]
