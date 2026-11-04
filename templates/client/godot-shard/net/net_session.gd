@@ -34,63 +34,153 @@ var _map := -1
 var _cell_subs := {} # Vector3i(map, cx, cy) -> SpacetimeDBSubscription
 var _cell_size := 32.0
 var _callbacks_registered := false
+var _connect_generation := 0
+var _transport_generation := -1
+var _connected_profile := ""
+var _schema_request: HTTPRequest
 
 
 func _ready() -> void:
 	client = SpacetimeDB.Mmo
 	client.connected.connect(_on_connected)
-	client.disconnected.connect(func(): session_disconnected.emit())
-	client.connection_error.connect(func(code, reason): push_warning("NetSession connection error %s: %s" % [code, reason]))
+	client.disconnected.connect(_on_disconnected)
+	client.connection_error.connect(_on_connection_error)
 
 
+# Bind endpoint/profile/options and generation before any asynchronous response.
 func connect_to_server(url: String = server_url, db: String = database, p_profile: String = profile) -> void:
+	_invalidate_connect()
+	var generation := _connect_generation
 	server_url = url
 	database = db
 	profile = p_profile
 	var options := SpacetimeDBConnectionOptions.new()
-	options.compression = SpacetimeDBConnectionOptions.CompressionPreference.NONE # no Brotli in this SDK
+	options.compression = SpacetimeDBConnectionOptions.CompressionPreference.NONE
 	options.threading = true
-	# Never let the SDK fall back to its single shared saved token: a profile's token is passed explicitly
-	# below, anything else asks the server for a fresh identity (two windows = two players).
 	options.one_time_token = true
-	options.save_token = false # NetSession owns token storage (per profile)
-	if not profile.is_empty():
-		var path := _token_path()
-		if FileAccess.file_exists(path):
-			options.token = FileAccess.get_file_as_string(path).strip_edges()
-	# Refuse mismatched old/new dialogue bindings before opening a BSATN subscription (D11).
-	var request := HTTPRequest.new()
+	options.save_token = false
+	options.token = _read_profile_token(p_profile)
+	var request := _new_schema_request()
+	_schema_request = request
 	request.timeout = 10.0
+	request.body_size_limit = 4 * 1024 * 1024
 	add_child(request)
-	var schema_url := server_url.replace("wss://", "https://").replace("ws://", "http://")
-	var err := request.request(schema_url.trim_suffix("/") + "/v1/database/" + database.uri_encode() + "/schema?version=10")
-	if err != OK:
-		request.queue_free()
-		schema_rejected.emit("Dialogue schema unavailable")
+	request.request_completed.connect(_on_schema_completed.bind(generation, request, url, db, p_profile, options), CONNECT_ONE_SHOT)
+	var schema_url := url.replace("wss://", "https://").replace("ws://", "http://")
+	var err := _start_schema_request(request, schema_url.trim_suffix("/") + "/v1/database/" + db.uri_encode() + "/schema?version=10")
+	if err != OK and generation == _connect_generation:
+		_reject_schema("Dialogue schema unavailable")
+
+
+func _new_schema_request() -> HTTPRequest:
+	return HTTPRequest.new()
+
+
+func _start_schema_request(request: HTTPRequest, url: String) -> Error:
+	return request.request(url)
+
+
+func _read_profile_token(p_profile: String) -> String:
+	if p_profile.is_empty():
+		return ""
+	var path := "user://identity_%s.token" % p_profile
+	return FileAccess.get_file_as_string(path).strip_edges() if FileAccess.file_exists(path) else ""
+
+
+func _invalidate_connect() -> void:
+	_connect_generation += 1
+	if is_instance_valid(_schema_request):
+		_schema_request.cancel_request()
+		_schema_request.queue_free()
+	_schema_request = null
+
+
+func _reject_schema(reason: String) -> void:
+	_invalidate_connect()
+	schema_rejected.emit(reason)
+
+
+func _on_schema_completed(result: int, status: int, _headers: PackedStringArray, body: PackedByteArray,
+		generation: int, request: HTTPRequest, url: String, db: String, p_profile: String,
+		options: SpacetimeDBConnectionOptions) -> void:
+	if generation != _connect_generation or request != _schema_request or not is_inside_tree():
 		return
-	var response: Array = await request.request_completed
+	_schema_request = null
 	request.queue_free()
-	var expected: StringName = MmoNpcMeta.BSATN_TYPES[&"talk"]
-	var schema = JSON.parse_string(PackedByteArray(response[3]).get_string_from_utf8())
-	if response[0] != HTTPRequest.RESULT_SUCCESS or response[1] != 200 or not DialogueSchema.matches(schema, expected):
-		print("SCHEMA_REJECT dialogue expected=%s" % expected)
-		schema_rejected.emit("Dialogue schema and client bindings differ; use a matching build")
+	# Error pages/failed transports must never reach the JSON parser.
+	if result != HTTPRequest.RESULT_SUCCESS or status != 200 or body.is_empty():
+		_reject_schema("Dialogue schema unavailable")
 		return
-	client.connect_db(server_url, database, options)
+	var parser := JSON.new()
+	if parser.parse(body.get_string_from_utf8()) != OK:
+		_reject_schema("Dialogue schema unavailable")
+		return
+	var expected: StringName = MmoNpcMeta.BSATN_TYPES[&"talk"]
+	if not DialogueSchema.matches(parser.data, expected):
+		print("SCHEMA_REJECT dialogue expected=%s" % expected)
+		_reject_schema("Dialogue schema and client bindings differ; use a matching build")
+		return
+	_transport_generation = generation
+	_connected_profile = p_profile
+	_connect_checked(url, db, options)
 
 
-func _token_path() -> String:
-	return "user://identity_%s.token" % profile
+func _connect_checked(url: String, db: String, options: SpacetimeDBConnectionOptions) -> void:
+	client.connect_db(url, db, options)
+
+
+func _disconnect_transport() -> void:
+	if is_instance_valid(client) and client.is_connected_db():
+		client.disconnect_db()
+
+
+## Cancel even if the schema request has not opened a socket yet.
+func disconnect_from_server() -> void:
+	_invalidate_connect()
+	is_joined = false
+	_disconnect_transport()
+	_emit_disconnected.call_deferred(_connect_generation)
+
+
+func _emit_disconnected(generation: int) -> void:
+	if generation == _connect_generation and is_inside_tree():
+		session_disconnected.emit()
+
+
+func _on_disconnected() -> void:
+	# A prior transport closing during a newer schema check cannot cancel it.
+	if _transport_generation != _connect_generation:
+		return
+	_invalidate_connect()
+	is_joined = false
+	session_disconnected.emit()
+
+
+func _on_connection_error(code: int, reason: String) -> void:
+	if _transport_generation != _connect_generation:
+		return
+	_invalidate_connect()
+	is_joined = false
+	push_warning("NetSession connection error %s: %s" % [code, reason])
+
+
+func _exit_tree() -> void:
+	_invalidate_connect()
+	_disconnect_transport()
 
 
 func _on_connected(identity: PackedByteArray, token: String) -> void:
+	var generation := _transport_generation
+	if generation != _connect_generation:
+		return
+	var token_profile := _connected_profile
 	my_identity = identity
 	if not _callbacks_registered: # client.db only exists once the SDK has initialized
 		_callbacks_registered = true
 		client.db.entity_transform.on_insert(_on_transform)
 		client.db.entity_transform.on_update(func(_old, row): _on_transform(row))
-	if not profile.is_empty():
-		var f := FileAccess.open(_token_path(), FileAccess.WRITE)
+	if not token_profile.is_empty():
+		var f := FileAccess.open("user://identity_%s.token" % token_profile, FileAccess.WRITE)
 		if f:
 			f.store_string(token)
 			f.close()
@@ -114,6 +204,8 @@ func _on_connected(identity: PackedByteArray, token: String) -> void:
 		"SELECT * FROM entity_transform WHERE identity = 0x%s" % hex,
 	]))
 	await sub.wait_for_applied(10)
+	if generation != _connect_generation or not is_inside_tree():
+		return
 	for cfg in client.db.world_config.iter():
 		_cell_size = float(cfg.cell_size)
 	session_connected.emit(hex)

@@ -29,7 +29,7 @@ func proof() -> void:
     var after = net.my_transform()
     var changed := Vector2(after.x, after.y).distance_to(before) > 0.1
     print("SESSION_WIDTH state identity=%s x=%.3f y=%.3f moved=%d peers=%d" % [identity, after.x, after.y, int(changed), net.visible_transforms().size()])
-    net.client.disconnect_db()
+    net.disconnect_from_server()
     await create_timer(0.5).timeout
     if "--move" in args and not changed:
         quit(1)

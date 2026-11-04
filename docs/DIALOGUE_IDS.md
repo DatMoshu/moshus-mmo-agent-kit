@@ -35,6 +35,14 @@ uses slots 0..7 with talk [0,15,255,256,319,1025,1430,65535]. Optional
 `tests/dialogue_session_check.gd` takes URL DB PROFILE and optional `--move` for
 persisted identity/position checks. No retail dialogue belongs in these fixtures.
 
+`tests/dialogue_connect_check.gd` runs deterministic delayed/out-of-order HTTP
+completion checks against NetSession. Each attempt binds its own endpoint,
+profile and options to a monotonic generation; superseding calls, failures,
+`Net.disconnect_from_server()` and teardown invalidate/dispose pending HTTP.
+Use the Net cancellation method rather than disconnecting the SDK directly,
+including before a socket exists. Requests have a 10-second timeout and 4 MiB
+body limit; transport/status failures are rejected before parsing JSON.
+
 ## Paired adoption and saves
 
 NetSession checks the public version-10 schema before opening its BSATN socket.

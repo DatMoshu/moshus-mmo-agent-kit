@@ -55,7 +55,7 @@ func proof() -> void:
     await create_timer(3).timeout
     print("DIALOGUE_PEERS count=%d" % net.client.db.player.iter().size())
     if "--reconnect" in args:
-        net.client.disconnect_db()
+        net.disconnect_from_server()
         await net.session_disconnected
         await create_timer(0.25).timeout
         net.connect_to_server(args[0], args[1], args[3])
@@ -64,7 +64,7 @@ func proof() -> void:
         check(await net.join(args[3]) == "", "rejoin")
         check(net.npc_meta(5).talk == 1025, "reconnect ID")
         print("DIALOGUE_RECONNECT same=1 talk=%d" % net.npc_meta(5).talk)
-    net.client.disconnect_db()
+    net.disconnect_from_server()
     await create_timer(0.5).timeout
     print("DIALOGUE_LIVE %s failures=%d" % ["PASS" if failed == 0 else "FAIL", failed])
     quit(0 if failed == 0 else 1)
