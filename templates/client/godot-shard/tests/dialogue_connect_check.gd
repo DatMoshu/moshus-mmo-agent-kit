@@ -59,7 +59,6 @@ func proof() -> void:
     check(p.connected == [["http://A", "db-A", "A", "fabricated-A"]], "no mutable defaults after response")
     # A stale failure and prior transport close/error cannot cancel a pending B schema.
     p = fresh(); a = begin(p, "A"); b = begin(p, "B")
-    p._transport_generation = p._connect_generation - 1
     p._on_disconnected(); p._on_connection_error(1, "stale")
     reply(a, body(), HTTPRequest.RESULT_TIMEOUT)
     check(p.notices == 0 and p.rejected.is_empty(), "stale close failure quiet")

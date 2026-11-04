@@ -19,7 +19,7 @@ func _start_schema_request(_request: HTTPRequest, url: String) -> Error:
 func _read_profile_token(p_profile: String) -> String:
     return "fabricated-" + p_profile
 func _connect_checked(url: String, db: String, options: SpacetimeDBConnectionOptions) -> void:
-    connected.append([url, db, _connected_profile, options.token])
+    connected.append([url, db, _transport_owner["profile"], options.token])
 func _disconnect_transport() -> void:
     pass
 func completion(index: int) -> Callable:

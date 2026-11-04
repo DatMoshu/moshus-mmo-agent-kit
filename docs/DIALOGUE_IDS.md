@@ -40,7 +40,7 @@ completion checks against NetSession. Each attempt binds its own endpoint,
 profile and options to a monotonic generation; superseding calls, failures,
 `Net.disconnect_from_server()` and teardown invalidate/dispose pending HTTP.
 Use the Net cancellation method rather than disconnecting the SDK directly,
-including before a socket exists. Requests have a 10-second timeout and 4 MiB
+including before a socket exists. HTTP requests have a 10-second timeout and 4 MiB
 body limit; transport/status failures are rejected before parsing JSON.
 
 ## Paired adoption and saves
@@ -64,3 +64,31 @@ story-completion claims.
 
 Provenance: original task1578 implementation against accepted task1577 contract
 DIALOGUE-ID-COMPAT (2325611); no reference engine implementation was consulted.
+
+## SDK transport ownership (task1578 R3)
+
+After a schema passes, a separate read-only owner binds the actual SDK transport
+to its generation, endpoint, database and profile. A second connect request is
+refused immediately while that owner exists, before HTTP or SDK endpoint/token
+mutation. A matching queued schema response also rechecks ownership at the SDK
+boundary. Refusing a second attempt does not transfer the first transport to it.
+
+The pinned SDK public disconnect API only closes an established socket. It does
+not cancel pending initialization. Net cancellation during that interval retains
+the old owner, suppresses token writes/session authorization, and closes any late
+connected event. Only observed disconnected plus a frame (after SDK flags reset)
+releases ownership. An error or 10-second timeout alone never proves the SDK idle:
+Net reports a failure/restart outcome and keeps overlap blocked. Teardown also
+suppresses late persistence. No SDK internals are patched in the product.
+
+Same endpoint/database/profile can reconnect after that terminal boundary. Because
+the SDK retains identity and caches, changing endpoint, database or profile after
+an SDK start requires a fresh client process; Net explicitly refuses that change.
+This is a conservative integration constraint for consumers, not transparent
+multi-shard handoff support. Consumers must review this policy during paired adoption.
+
+`tests/dialogue_transport_check.gd` runs delayed initialization, overlap, token
+persistence, cancellation, error/disconnect/timeout and teardown vectors. Its
+synthetic client models SDK metadata mutation followed by the connecting guard;
+it also invokes the actual unmodified pinned low-level connecting guard with a
+fabricated pending flag, returning before any networking. All tokens are made up.

@@ -35,9 +35,13 @@ var _cell_subs := {} # Vector3i(map, cx, cy) -> SpacetimeDBSubscription
 var _cell_size := 32.0
 var _callbacks_registered := false
 var _connect_generation := 0
-var _transport_generation := -1
-var _connected_profile := ""
 var _schema_request: HTTPRequest
+# Untagged SDK events belong to this immutable owner until a proven terminal boundary.
+var _transport_owner: Dictionary = {}
+# The SDK retains identity/cache on reconnect; changing this binding requires a fresh client.
+var _sdk_binding: Dictionary = {}
+var _transport_cancelled := false
+var _transport_timer: Timer
 
 
 func _ready() -> void:
@@ -49,6 +53,13 @@ func _ready() -> void:
 
 # Bind endpoint/profile/options and generation before any asynchronous response.
 func connect_to_server(url: String = server_url, db: String = database, p_profile: String = profile) -> void:
+	if not _transport_owner.is_empty():
+		schema_rejected.emit("A session is connected, connecting or closing; disconnect and wait before retrying")
+		return
+	var binding := {"url": url, "database": db, "profile": p_profile}
+	if not _sdk_binding.is_empty() and _sdk_binding != binding:
+		schema_rejected.emit("Restart the client to change endpoint, database or identity profile")
+		return
 	_invalidate_connect()
 	var generation := _connect_generation
 	server_url = url
@@ -120,8 +131,17 @@ func _on_schema_completed(result: int, status: int, _headers: PackedStringArray,
 		print("SCHEMA_REJECT dialogue expected=%s" % expected)
 		_reject_schema("Dialogue schema and client bindings differ; use a matching build")
 		return
-	_transport_generation = generation
-	_connected_profile = p_profile
+	# Defence at the SDK boundary: never mutate its endpoint/token while it owns a transport.
+	if not _transport_owner.is_empty():
+		_reject_schema("Previous session has not disconnected; restart the client if it cannot finish")
+		return
+	_transport_owner = {"generation": generation, "url": url, "database": db, "profile": p_profile}
+	_transport_owner.make_read_only()
+	if _sdk_binding.is_empty():
+		_sdk_binding = {"url": url, "database": db, "profile": p_profile}
+		_sdk_binding.make_read_only()
+	_transport_cancelled = false
+	_arm_transport_timeout(_transport_owner)
 	_connect_checked(url, db, options)
 
 
@@ -134,12 +154,17 @@ func _disconnect_transport() -> void:
 		client.disconnect_db()
 
 
-## Cancel even if the schema request has not opened a socket yet.
+## HTTP cancels immediately. A pending SDK initialization has no supported cancel API:
+## retain ownership, refuse overlap, and close it if a late connected event arrives.
 func disconnect_from_server() -> void:
 	_invalidate_connect()
 	is_joined = false
+	if _transport_owner.is_empty():
+		_emit_disconnected.call_deferred(_connect_generation)
+		return
+	_transport_cancelled = true
+	_arm_transport_timeout(_transport_owner)
 	_disconnect_transport()
-	_emit_disconnected.call_deferred(_connect_generation)
 
 
 func _emit_disconnected(generation: int) -> void:
@@ -147,44 +172,104 @@ func _emit_disconnected(generation: int) -> void:
 		session_disconnected.emit()
 
 
-func _on_disconnected() -> void:
-	# A prior transport closing during a newer schema check cannot cancel it.
-	if _transport_generation != _connect_generation:
+func _stop_transport_timer() -> void:
+	if is_instance_valid(_transport_timer):
+		_transport_timer.stop()
+		_transport_timer.queue_free()
+	_transport_timer = null
+
+
+func _arm_transport_timeout(owner: Dictionary) -> void:
+	_stop_transport_timer()
+	_transport_timer = Timer.new()
+	_transport_timer.one_shot = true
+	_transport_timer.wait_time = 10.0
+	add_child(_transport_timer)
+	_transport_timer.timeout.connect(_transport_timed_out.bind(owner), CONNECT_ONE_SHOT)
+	_transport_timer.start()
+
+
+func _transport_timed_out(owner: Dictionary) -> void:
+	if _transport_owner != owner or not is_inside_tree():
 		return
+	_stop_transport_timer()
+	_transport_cancelled = true
 	_invalidate_connect()
+	_disconnect_transport()
+	# A timeout is NOT evidence that the SDK is idle. Keep the owner latched.
+	schema_rejected.emit("Session did not reach a safe connection boundary; restart the client")
+
+
+func _on_disconnected() -> void:
+	if _transport_owner.is_empty():
+		return
+	_transport_cancelled = true
 	is_joined = false
+	_invalidate_connect()
+	_finish_transport.call_deferred(_transport_owner)
+
+
+func _finish_transport(owner: Dictionary) -> void:
+	# The pinned SDK emits disconnected before resetting its connecting flags.
+	# Wait for its emitting stack and next frame before admitting another SDK start.
+	if not is_inside_tree():
+		return
+	await get_tree().process_frame
+	if _transport_owner != owner or not is_inside_tree():
+		return
+	_stop_transport_timer()
+	_transport_owner = {}
 	session_disconnected.emit()
 
 
 func _on_connection_error(code: int, reason: String) -> void:
-	if _transport_generation != _connect_generation:
+	if _transport_owner.is_empty():
 		return
+	var was_current: bool = not _transport_cancelled and _transport_owner["generation"] == _connect_generation
+	_transport_cancelled = true
 	_invalidate_connect()
 	is_joined = false
-	push_warning("NetSession connection error %s: %s" % [code, reason])
+	_disconnect_transport()
+	# Some SDK errors (e.g. auth failure) have no disconnect event. Do not infer idle.
+	if was_current:
+		push_warning("NetSession connection error %s: %s" % [code, reason])
+		schema_rejected.emit("Session failed; wait for disconnect or restart the client before retrying")
 
 
 func _exit_tree() -> void:
 	_invalidate_connect()
+	_transport_cancelled = true
+	_stop_transport_timer()
 	_disconnect_transport()
 
 
 func _on_connected(identity: PackedByteArray, token: String) -> void:
-	var generation := _transport_generation
-	if generation != _connect_generation:
+	if _transport_owner.is_empty():
 		return
-	var token_profile := _connected_profile
+	var owner := _transport_owner
+	if _transport_cancelled or owner["generation"] != _connect_generation or not is_inside_tree():
+		_disconnect_transport()
+		return
+	_stop_transport_timer()
 	my_identity = identity
-	if not _callbacks_registered: # client.db only exists once the SDK has initialized
+	_persist_profile_token(owner["profile"], token)
+	_subscribe_connected(identity, owner)
+
+
+func _persist_profile_token(p_profile: String, token: String) -> void:
+	if p_profile.is_empty():
+		return
+	var f := FileAccess.open("user://identity_%s.token" % p_profile, FileAccess.WRITE)
+	if f:
+		f.store_string(token)
+		f.close()
+
+
+func _subscribe_connected(identity: PackedByteArray, owner: Dictionary) -> void:
+	if not _callbacks_registered:
 		_callbacks_registered = true
 		client.db.entity_transform.on_insert(_on_transform)
 		client.db.entity_transform.on_update(func(_old, row): _on_transform(row))
-	if not token_profile.is_empty():
-		var f := FileAccess.open("user://identity_%s.token" % token_profile, FileAccess.WRITE)
-		if f:
-			f.store_string(token)
-			f.close()
-	# Small, global tables: config, player roster, server health, and my own transform.
 	var hex := identity.hex_encode()
 	var sub := client.subscribe(PackedStringArray([
 		"SELECT * FROM world_config",
@@ -204,7 +289,7 @@ func _on_connected(identity: PackedByteArray, token: String) -> void:
 		"SELECT * FROM entity_transform WHERE identity = 0x%s" % hex,
 	]))
 	await sub.wait_for_applied(10)
-	if generation != _connect_generation or not is_inside_tree():
+	if _transport_owner != owner or _transport_cancelled or owner["generation"] != _connect_generation or not is_inside_tree():
 		return
 	for cfg in client.db.world_config.iter():
 		_cell_size = float(cfg.cell_size)
