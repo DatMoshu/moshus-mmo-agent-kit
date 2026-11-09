@@ -8,6 +8,12 @@ license = "Apache-2.0"
 [lib]
 crate-type = ["cdylib"]
 
+[features]
+# Optional project-owned tick dispatch. Off: `tick` runs `tick_body` directly. On: the crate must
+# provide `src/project_tick.rs` with `pub fn dispatch(ctx, TickSchedule)`, which must end in
+# `core::movement::tick_body`, never `tick`.
+project-tick = []
+
 [dependencies]
 # Pinned to match stdb.lock. Bump the CLI, the server, this crate and every client SDK together.
 spacetimedb = "=2.14.0"

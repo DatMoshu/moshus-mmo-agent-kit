@@ -50,6 +50,25 @@ pub fn build_occupancy(ctx: &ReducerContext, players: &[EntityTransform]) -> Occ
 
 #[reducer]
 pub fn tick(ctx: &ReducerContext, _row: TickSchedule) -> Result<(), String> {
+    // Entry guard dominates both branches: a project dispatcher can never skip it.
+    if ctx.sender() != ctx.database_identity() {
+        return Err("tick is scheduler-only".into());
+    }
+    // Optional project-owned dispatch (default off). The parameter stays named `_row`: the
+    // reducer's exported argument names are part of the schema.
+    #[cfg(feature = "project-tick")]
+    {
+        crate::project_tick::dispatch(ctx, _row)
+    }
+    #[cfg(not(feature = "project-tick"))]
+    {
+        tick_body(ctx, _row)
+    }
+}
+
+/// The simulation body. Not a reducer; a project dispatcher continues into it (never into `tick`,
+/// which would recurse). It keeps its own scheduler-only guard for internal callers.
+pub fn tick_body(ctx: &ReducerContext, _row: TickSchedule) -> Result<(), String> {
     // Scheduled reducers are ordinary reducers: without this guard any client could call tick.
     if ctx.sender() != ctx.database_identity() {
         return Err("tick is scheduler-only".into());

@@ -21,3 +21,6 @@
 //! Rules this module follows are in `rules/rust-module.md` at the kit root.
 
 pub mod core;
+
+#[cfg(feature = "project-tick")]
+pub mod project_tick;
