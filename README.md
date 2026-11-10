@@ -1,150 +1,97 @@
 # Moshu's MMO Agent Kit
 
-**An agent kit for building multiplayer games on [SpacetimeDB](https://spacetimedb.com).**
-It gives you 18 specialist agent roles, 23 skills, rules and gates for an AI coding agent
-(Claude Code, Codex, Cursor, Grok and others), plus a server template and client starters that
-have been run end to end, a bot harness, and a load gate. Start with two players moving in 30
-minutes, then grow the same design toward thousands of players.
+Build a server-authoritative multiplayer prototype on **SpacetimeDB 2.14.0** with reference modules, client starters, agent instructions, and executable verification tools.
 
-> Pinned to **SpacetimeDB 2.14.0** (`stdb.lock`). SpacetimeDB moves fast, and most agent
-> mistakes come from version drift, so everything here is locked and checked.
+For developers working with a coding agent: start with a small movement world, prove that two independent clients observe each other, then add gameplay under the same authority and verification rules. This is a starting kit; production capacity depends on your game, hardware, subscriptions, and measurements.
 
-## What's inside
+[Start here](docs/wiki/Installation.md) | [Documentation](docs/wiki/Home.md) | [Template guide](docs/wiki/Server-and-client-templates.md) | [Contributing](CONTRIBUTING.md) | [Security](SECURITY.md)
 
-| Path | What it is |
-|---|---|
-| `AGENTS.md`, `CLAUDE.md` | Entry points your coding agent reads first: hard rules, routing, gates |
-| `agents/` | 18 role definitions (architect, schema, reducer, sharding, netcode, client, security, load test, licence steward, ...) |
-| `skills/` | 23 kit skills (patterns, gotchas, wrong-vs-right, checklists) plus the 11 official SpacetimeDB skills vendored in `skills/vendor/official/` |
-| `rules/` | Non-negotiables and the hallucinated-API catalog used by `kit.py check` |
-| `docs/` | Decision tree, scale ladder (10 to 5,000 players), processes, verification log, licensing guide (not legal advice) |
-| `templates/server/rust-single` | A running Rust world module: admission, players, 20 Hz movement tick, AOI cells, health and degradation levels |
-| `templates/client/godot` | A Godot 4.7 client on the MIT flametime SDK behind a small `Net` seam, with a headless autopilot test |
-| `templates/server/ts-single` | The same world in TypeScript, wire-compatible with every client (verified) |
-| `templates/server/rust-sharded` | Global and region databases with 2.14 cross-database outbox handoff, plus `dev_up.py` (verified locally) |
-| `templates/server/rust-shard` | Clean-room tile-world MMO core (maps, portals, NPCs, PvE combat, items, operator seeding of a `mmo-core-world/1` document); see `docs/SHARD_CORE.md` (verified locally with the Meadowmere fixture) |
-| `templates/sidecar` | A Node helper process: world census, health-guard pattern, and a place for NPC/outbox work (verified) |
-| `templates/client/godot-shard` | Godot 4.7 client for `rust-shard`: 2D tile renderer + 3D voxel diorama, HUD/chat/talk, one `game/game.gd` hook (verified headless and under Xvfb, 2 clients, 2D and 3D) |
-| `templates/client/web-admin` | Vite + TypeScript live map and admin console (built and verified in headless Chrome) |
-| `templates/client/unity` | Thin Unity starter. The session logic is verified headlessly with .NET; the editor was not run |
-| `templates/client/unreal` | Thin Unreal C++ starter, with bindings generated and the API checked by hand. **Not compiled** |
-| `tools/kit.py` | One CLI: `doctor`, `server`, `publish`, `bindings`, `smoke`, `loadtest`, `check`, `new`, `vendor-skills`, `install-claude`, `kb-export` |
-| `tools/loadtest/bots` | A TypeScript bot swarm (SDK 2.14): smoke test, AOI-aware swarm, latency percentiles, tick health |
-| `tools/shard` | Shard tooling: `seeder.py` (world document -> seed reducers), `fixture_game.py` (Meadowmere test world + 2-client route test), `vendor_core.py` (copy the core into a game repo and verify it) |
-| `recipes/` | Copyable features with compiled, run-checked Rust snippets: AOI, inventory/trades, chat, idempotent requests, operator role, region hand-off client, invite-only playtest |
-| `evals/` | `run_evals.py` (hallucination-rule self-test, frontmatter, links) plus 10 graded agent-behaviour scenarios |
-| `kb/` | A public knowledge base of facts, gotchas, patterns, processes, decisions, versions and sources, each with confidence and evidence. Stored as JSON; `kit.py kb-export` builds a SQLite copy |
-
-## 30-minute quickstart: two players moving
-
-You need **SpacetimeDB 2.14.0**, **Rust 1.97.1** with the `wasm32-unknown-unknown` target,
-**Node 22+**, and **Python 3.11+**. Godot 4.7 is optional (for step 6).
-
-**1. Install the toolchain (about 10 minutes, once).**
-
-```bash
-# SpacetimeDB CLI (macOS/Linux). On Windows: iwr https://windows.spacetimedb.com -useb | iex
-curl -sSf https://install.spacetimedb.com | sh
-spacetime version install 2.14.0 && spacetime version use 2.14.0
-
-# Rust: https://rustup.rs, then:
-rustup toolchain install 1.97.1 --target wasm32-unknown-unknown
+```mermaid
+flowchart LR
+    A[Player or bot] -->|join and movement intent| R[Reducers: admission and validation]
+    R --> I[Private input rows]
+    I --> T[Scheduled movement tick]
+    T --> H[Public transforms and tick health]
+    H -->|indexed cell subscriptions| C[Client local cache]
+    C --> V[Godot renderer or web dashboard]
+    G[AGENTS.md, roles, skills] -.->|implementation rules| R
+    Q[Smoke and load harness] -->|independent clients| A
 ```
 
-**2. Check everything against `stdb.lock`.**
+## Get a local world running
 
-```bash
-python tools/kit.py doctor          # every line should be OK (Godot is optional)
+Install the versions in [stdb.lock](stdb.lock): Python 3.11+, Node 22+, SpacetimeDB 2.14.0, and Rust 1.97.1 with `wasm32-unknown-unknown`. Windows Rust builds also need the Visual Studio C++ build tools. Godot 4.7 is optional for the minimal bot path. See [installation](docs/wiki/Installation.md) for platform details.
+
+From the repository root, run the isolated verification path:
+
+```sh
+python tools/quickstart/verify.py
 ```
 
-**3. Start a local SpacetimeDB.** Leave it running in its own terminal.
+It builds from source, installs locked bot dependencies, generates fresh bot bindings, typechecks, starts its own server on a free loopback port, publishes, and runs two-client smoke. It retains logs and `receipt.json` in the printed external work directory and stops its owned server on exit. Add `--loadtest` for a 10-bot, five-second diagnostic. [Installation](docs/wiki/Installation.md) explains options and prerequisites. On Windows use Developer PowerShell with the Visual Studio C++ workload.
 
-```bash
-python tools/kit.py server          # = spacetime start --listen-addr 127.0.0.1:3000
-# Add --isolated to keep the CLI config and data under .kit/, leaving your global config alone.
+For the manual development loop, start a local server in one terminal:
+
+```sh
+python tools/kit.py server --isolated
 ```
 
-**4. Build and publish the world module.** The first build takes a few minutes.
+In a second terminal:
 
-```bash
-python tools/kit.py publish         # builds templates/server/rust-single -> database "mmo-dev"
-```
-
-**5. Prove two players can join and see each other move.**
-
-```bash
+```sh
+python tools/kit.py publish
 python tools/kit.py smoke
-# ... "verdict": "PASS" ... SMOKE PASS
 ```
 
-Two bot clients connect, join, move in different directions, and each one checks that it saw
-the other move. This uses the real SDK, the real subscriptions, and the real tick.
+The smoke harness uses the real SDK and subscriptions: two identities join, send movement intent, and each must observe the other's movement. Look for the final `SMOKE PASS`; a successful publish alone does not prove the client path. Installation downloads and first compilation vary, so no fixed setup time is promised. Use a fresh disposable local database, and read [testing](docs/wiki/Testing.md) before changing endpoints or wiping data.
 
-**6. (Optional) Do the same with Godot.**
+## Choose the right starting point
 
-```bash
-GODOT=/path/to/godot python tools/kit.py smoke --godot   # two headless Godot clients
+| Component | Purpose | Evidence and limits |
+|---|---|---|
+| [rust-single](templates/server/rust-single) | 20 Hz movement, admission, AOI cells, health | Historical Linux build and two-client smoke; Windows runtime used prebuilt Wasm |
+| [ts-single](templates/server/ts-single) | TypeScript implementation of the movement world | Historical local cross-client verification |
+| [rust-sharded](templates/server/rust-sharded) | Global registry, region databases, outbox handoff | Historical local handoff and spoof-rejection tests; more operational work |
+| [rust-shard](templates/server/rust-shard) + [godot-shard](templates/client/godot-shard) | Tile world, NPCs, combat, items, world-document adapter | Historical synthetic Meadowmere fixture checks; separate schema from movement world |
+| [godot](templates/client/godot) | Movement client using the vendored community SDK | Historical headless two-client smoke; engine versions recorded in verification log |
+| [web-admin](templates/client/web-admin) | Live map and operations UI | Historical build and headless browser exercise |
+| [unity](templates/client/unity) | Thin C# starter | Historical headless session check; Unity editor untested |
+| [unreal](templates/client/unreal) | Thin C++ starter | Generated bindings and source review; **not compiled** |
+| [sidecar](templates/sidecar) | External Node helper and health-guard pattern | Historical local census check; game-specific AI remains your work |
+
+These are summaries of dated records in [VERIFICATION.md](docs/VERIFICATION.md), not results from the current checkout. A fresh Windows movement-path source build and smoke was also exercised during [release preparation](docs/public-readiness/README.md). [Validation policy](docs/wiki/Testing.md) explains what to rerun and how to report fresh evidence. macOS has no recorded runtime proof in that log.
+
+## Make it yours
+
+```sh
+python tools/kit.py new my-game --dest ..
+python tools/kit.py new my-rpg --server rust-shard --client godot-shard
 ```
 
-To play by hand, open `templates/client/godot` in Godot 4.7 and run it twice
-(Debug > Customize Run Instances > 2). Move with WASD or the arrow keys.
+The scaffolder creates `server`, `client`, tooling, rules, skills, and docs; it refuses to overwrite an existing destination. Follow its printed next steps. Template combinations have different schemas: use the [compatibility guide](docs/wiki/Server-and-client-templates.md), then [first project](docs/wiki/First-project.md).
 
-**7. Load it.**
+Example agent task:
 
-```bash
-python tools/kit.py loadtest --bots 100 --duration 20     # PASS / CONCERNS / FAIL vs tools/loadtest/budgets.json
-```
+> Read AGENTS.md and the schema/reducer skills. Add region chat with indexed subscriptions, validate the sender on the server, and report build, binding, and two-client test results.
 
-**8. Make it yours.**
+## How the pieces fit
 
-```bash
-python tools/kit.py new my-game --dest ..    # copies server + client + tools + rules into ../my-game
-python tools/kit.py new my-mmo --server ts-single --client web-admin --sidecar   # other combinations
-python tools/kit.py new my-rpg --server rust-shard --client godot-shard          # tile-world RPG shard (docs/SHARD_CORE.md)
-```
+| Location | Responsibility |
+|---|---|
+| [AGENTS.md](AGENTS.md), [CLAUDE.md](CLAUDE.md), [agents](agents), [skills](skills) | Agent contract, specialist routing, implementation patterns and official API references |
+| [rules](rules), [evals](evals) | Anti-pattern catalog, rule self-tests, documentation checks, and review scenarios |
+| [templates](templates), [recipes](recipes) | Runnable starting modules and focused feature examples |
+| [tools/kit.py](tools/kit.py), [tools/loadtest](tools/loadtest) | Toolchain diagnosis, scaffolding, publishing, bindings, smoke, and load gates |
+| [docs](docs), [kb](kb) | Design guidance, processes, historical evidence, and evidence-tagged knowledge |
 
-Then point your agent at it: *"Read AGENTS.md. Add a chat channel per region, following
-skills/stdb-schema-design and the reducer gates."*
+The server decides positions and outcomes. Clients subscribe to state and submit intent. `entity_transform` is narrow and indexed by cell; input and admission rows stay private. Scheduled reducers check database identity. Read [architecture](docs/wiki/Architecture.md) for the exact data flow and current cost limits: the movement tick still iterates online entities, and optional housekeeping scans player rows.
 
-## How the agent side works
+For scale work, treat the [scale ladder](docs/scale-ladder.md) as planning guidance. Measure your own workload with the [load harness](tools/loadtest), including row updates, latency, errors, and scheduler lateness. A small local bot run is not a production capacity guarantee.
 
-* **`AGENTS.md`** is the contract. It covers the version pin, hard rules (identity, scheduled
-  reducers, no I/O in reducers, private by default), and the definition of done (build, bindings,
-  `check`, smoke, and a load gate for hot paths).
-* **Roles** in `agents/` say what each specialist owns, what it reads, what it must never do,
-  and how it hands off. A role has a model hint: deep-reasoning roles (architect, security,
-  sharding) are marked `opus`, and the rest work on any capable model.
-* **Skills** in `skills/` are short, concrete, and checked against the 2.14 API. Each skill
-  has a "wrong vs right" section, because agents copy the first example they see.
-* **`kit.py check`** greps for APIs that agents commonly invent or remember from older versions
-  (for example `ctx.identity()` used as the database identity, `spacetime_module!`,
-  `#[spacetimedb(table)]`, or `--project-path`) and prints the 2.14 fix.
+## License and attribution
 
-## Scale in one paragraph
+Kit-authored material is [Apache-2.0](LICENSE). [NOTICE](NOTICE) records the vendored Apache-2.0 official skills and MIT Godot SDK; preserve their licenses and human/upstream attribution. The SpacetimeDB server is separately licensed under BSL 1.1. Its [2.14.0 license](https://github.com/clockworklabs/SpacetimeDB/blob/v2.14.0/LICENSE.txt) restricts production use to at most one instance and excludes a Database Service under its Additional Use Grant. Review the actual terms and [licensing guide](docs/legal/LICENSING.md) for your topology. No legal certification is implied.
 
-A SpacetimeDB database is one transactional actor, so a single world database is the right
-choice up to a few hundred concurrent players doing movement plus gameplay. Past that, split
-it into a **global** database (accounts, social, economy) and **region** databases (simulation),
-linked with 2.14 inter-database calls (outbox tables). There is no cross-database transaction,
-so moving a player or item between regions uses **lock -> offer -> accept -> delete ->
-activate**. See `docs/scale-ladder.md` and `skills/stdb-sharding-plan`.
+See the [dependency inventory](docs/legal/DEPENDENCIES.md) for resolved package-license evidence and release checks. Vendored SDK copies include local modifications; their version label does not imply unmodified upstream bytes.
 
-## Licensing (read this before you ship)
-
-This kit is Apache-2.0. The SpacetimeDB **server** is BSL 1.1: you may run it in production,
-but not offer it to others as a database service. On 2031-10-25 it converts to AGPLv3 with a
-linking exception. The vendored Godot SDK is MIT. See `NOTICE` and
-`docs/legal/LICENSING.md` (**not legal advice**). Do not paste licensed game content or GPL
-code into a kit-based repo. The `license-steward` role exists to catch that.
-
-## Status
-
-Every template states whether it has been verified, and `docs/VERIFICATION.md` records what
-was run, on which OS, and what the result was. Anything not marked verified is a starter you
-should expect to fix.
-
-## Contributing
-
-Issues and PRs are welcome. Run `python tools/kit.py check` and the smoke test before opening
-a PR. When you bump SpacetimeDB, change `stdb.lock` first, then follow
-`docs/processes/version-bump.md`.
+This is an independent community project. Do not copy proprietary game assets/data or GPL code into the kit. See [contribution rules](CONTRIBUTING.md) and [release maintenance](docs/wiki/Release-maintenance.md).

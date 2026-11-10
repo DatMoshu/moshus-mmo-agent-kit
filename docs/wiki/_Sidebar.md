@@ -1,0 +1,15 @@
+# Handbook
+
+- [Home](Home.md)
+- [Installation](Installation.md)
+- [First project](First-project.md)
+- [Architecture](Architecture.md)
+- [Templates](Server-and-client-templates.md)
+- [Agent workflows](Agent-workflows.md)
+- [Recipes](Recipes.md)
+- [Testing](Testing.md)
+- [Troubleshooting](Troubleshooting.md)
+- [Version upgrades](Version-upgrades.md)
+- [Security](Security.md)
+- [Contribution](Contribution.md)
+- [Release maintenance](Release-maintenance.md)

@@ -1,0 +1,33 @@
+# Testing and evidence
+
+Run from the repository root unless a command names a module directory. Record actual output, exact commit, OS, versions, configuration and duration. Keep logs/caches out of commits. [VERIFICATION.md](../VERIFICATION.md) is historical evidence, not an assertion that the current checkout passed.
+
+| Gate | Command | Scope |
+|---|---|---|
+| Tools | `python tools/kit.py doctor` | Installed tools vs pins; inspect optional engine results |
+| Patterns | `python tools/kit.py check` | Known source patterns, not semantic security |
+| Kit self-evals | `python evals/run_evals.py` | Rule samples, frontmatter, references; scenarios require judgment |
+| Rust build | `cargo build --target wasm32-unknown-unknown --release` in module | Wasm compilation |
+| Publish | `python tools/kit.py publish` | Install/update at configured endpoint |
+| Codegen | `python tools/kit.py bindings` | Regenerate configured clients; review/commit schema changes |
+| Two observers | `python tools/kit.py smoke` | Both SDK identities observe the other's movement |
+| Godot observers | `python tools/kit.py smoke --godot` | Movement proof through Godot |
+| Load | `python tools/kit.py loadtest --bots 100 --duration 20` | Workload vs [budgets](../../tools/loadtest/budgets.json) |
+
+For module changes run AGENTS.md's definition of done. Add load checks for tick, AOI, or hot tables. Use template-specific tests for tile worlds and handoff: movement smoke cannot validate other schemas. Read [fixture help](../../tools/shard/fixture_game.py) and the [shard contract](../SHARD_CORE.md) before a live tile test.
+
+## Interpret results
+
+PASS, CONCERNS and FAIL are distinct. Low latency with missing clients or observers is not multiplayer proof. Inspect readiness, errors, observed movement, row-update volume, tick health, p95/p99 and duration. A local load result applies to that workload/configuration, not production capacity.
+
+Reconnect tests must reuse an identity and show the fresh input sequence moves it. Test both handoff directions, duplicates, unauthorized calls, and private views when affected. Feature assertions should exercise failure boundaries.
+
+For a denial test, first prove a positive control: the subject exists, the connection works, and the same action is observable when allowed. Then exercise the forbidden action and assert both the explicit refusal and unchanged relevant state over a bounded observation window. A missing subject, disconnected transport, silent timeout, or test that never reached the reducer cannot count as a successful denial. Use synthetic identities/content and avoid importing a consumer project's policy to obtain this general pattern.
+
+## Clean-checkout proof
+
+Run `python tools/quickstart/verify.py` in a disposable clean clone; use `--loadtest` for the optional small diagnostic. The runner records revision, platform, steps, duration and Wasm hash in receipt.json, retains logs, and cleans up its owned server. It does not install the toolchains. It generates bot bindings and node_modules in the source checkout, so inspect its status metadata and retain the fresh-clone provenance. The [Linux CI workflow](../../.github/workflows/verify.yml) uses this path and uploads logs/receipt; workflow source alone is not hosted execution proof.
+
+A candidate needs a new checkout without generated caches/prebuilt artifacts, installation from committed lockfiles, isolated endpoint/config/data, source build, and two observers. Record first-run and warm-run times separately and disclose installation/network exclusions. Clean up only owned processes. Do not wipe valuable databases or stop another developer's server for a port.
+
+KIT_WASM helps diagnose runtime setup but cannot prove local source builds. Platform claims must name the platform actually run. Missing tooling or blocked downloads are skipped/blocked with a reason, never PASS.
