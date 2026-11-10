@@ -10,8 +10,10 @@ build outputs and receipt.json. No fleet services, credentials or prebuilt wasm 
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
 import os
+import platform
 from pathlib import Path
 import re
 import shutil
@@ -83,11 +85,19 @@ def main() -> int:
     print(f"Verification evidence: {work}", flush=True)
     lock = tomllib.loads((ROOT / "stdb.lock").read_text(encoding="utf-8-sig"))
     env = dict(os.environ)
+    for key in list(env):
+        if key.lower().startswith("npm_config_") or key.upper() in ("NPM_TOKEN", "NODE_AUTH_TOKEN"):
+            env.pop(key)
     for key in ("KIT_WASM", "SPACETIME_ARGS", "GODOT", "CARGO_ENCODED_RUSTFLAGS", "RUSTFLAGS", "RUSTC_WRAPPER"):
         env.pop(key, None)
     env.update(CARGO_HOME=str(work / "cargo-home"), CARGO_TARGET_DIR=str(work / "target"),
-               npm_config_cache=str(work / "npm-cache"), npm_config_update_notifier="false")
-    receipt = {"verdict": "FAIL", "steps": [], "source": str(ROOT)}
+               npm_config_cache=str(work / "npm-cache"), npm_config_update_notifier="false",
+               npm_config_registry="https://registry.npmjs.org/",
+               npm_config_userconfig=str(work / "npm-user.conf"), npm_config_globalconfig=str(work / "npm-global.conf"))
+    for name in ("npm-user.conf", "npm-global.conf"):
+        (work / name).write_text("", encoding="utf-8")
+    receipt = {"verdict": "FAIL", "steps": [], "source": str(ROOT), "platform": platform.platform(),
+               "python": sys.version.split()[0], "toolchain_install": "prerequisite; excluded from run timing"}
     started = time.monotonic()
     server = None
     server_log = None
@@ -112,6 +122,8 @@ def main() -> int:
         return output
 
     try:
+        receipt["git_sha"] = step("revision", ["git", "rev-parse", "HEAD"]).strip()
+        receipt["git_status_before"] = step("source-status", ["git", "status", "--porcelain"]).strip()
         port = reserve_port(args.port)
         url = f"http://127.0.0.1:{port}"
         receipt["url"] = url
@@ -136,15 +148,21 @@ def main() -> int:
             raise RuntimeError("Git link.exe shadows the Microsoft linker. Run from Developer PowerShell for Visual Studio (C++ workload).")
         step("check", [sys.executable, "tools/kit.py", "check"])
         module = ROOT / lock["dev"]["module"]
+        step("cargo-fetch", [cargo, f"+{rust}", "fetch", "--locked", "--target", "wasm32-unknown-unknown"], module)
         step("build", [cargo, f"+{rust}", "build", "--locked", "--target", "wasm32-unknown-unknown", "--release"], module)
         package = tomllib.loads((module / "Cargo.toml").read_text(encoding="utf-8"))["package"]["name"]
         wasm = work / "target" / "wasm32-unknown-unknown" / "release" / (package.replace("-", "_") + ".wasm")
         if not wasm.is_file():
             raise RuntimeError(f"Source build produced no module: {wasm}")
+        receipt["wasm_sha256"] = hashlib.sha256(wasm.read_bytes()).hexdigest()
         bots = ROOT / "tools" / "loadtest" / "bots"
         step("npm-ci", [npm, "ci", "--no-audit", "--no-fund"], bots)
         step("bindings", [*cli_cmd, "generate", "--lang", "typescript", "--out-dir",
                           str(bots / "src" / "module_bindings"), "--bin-path", str(wasm), "--yes"])
+        tracked = step("tracked-bindings", ["git", "ls-files", "tools/loadtest/bots/src/module_bindings"]).strip()
+        receipt["bindings_baseline"] = "tracked" if tracked else "generated on demand; no committed bot bindings"
+        if tracked:
+            step("bindings-drift", ["git", "diff", "--exit-code", "--", "tools/loadtest/bots/src/module_bindings"])
         step("typecheck", [node, str(bots / "node_modules/typescript/bin/tsc"), "--noEmit"], bots)
         server_cmd = [*cli_cmd, "start", "--listen-addr", f"127.0.0.1:{port}", "--data-dir", str(work / "data")]
         server_log = (work / "server.log").open("w", encoding="utf-8")

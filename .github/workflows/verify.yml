@@ -34,6 +34,10 @@ jobs:
           echo "SPACETIME=$RUNNER_TEMP/stdb/spacetimedb-cli" >> "$GITHUB_ENV"
       - name: Tooling regressions
         run: python -m unittest discover -s tools/quickstart -p 'test_*.py' -v
+      - name: Documentation links and checker regressions
+        run: |
+          python tools/release/test_check_docs.py
+          python tools/release/check_docs.py
       - name: Build, generate, typecheck, publish and two-client smoke
         run: python tools/quickstart/verify.py --work-dir "${{ runner.temp }}/verification"
       - uses: actions/upload-artifact@v4
