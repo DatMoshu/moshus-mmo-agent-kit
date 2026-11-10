@@ -59,6 +59,18 @@ class ToolingTests(unittest.TestCase):
                 patch.object(kit, "bots_verdict", return_value=({"verdict": "PASS"}, result)):
             self.assertEqual(kit.cmd_smoke(argparse.Namespace(url="http://127.0.0.1:12345", db="test", godot=False)), 1)
 
+    def test_load_metrics_with_failure_exit_cannot_pass(self):
+        result = subprocess.CompletedProcess([], 2, '{}', '')
+        report = {"bots_ready": 2, "duration_seconds": 5, "row_updates_received": 10}
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            with patch.object(kit, "ensure_bots"), patch.object(kit, "wait_for_server", return_value=True), \
+                    patch.object(kit, "read_json", return_value={"metrics": {}}), \
+                    patch.object(kit, "bots_verdict", return_value=(report, result)), \
+                    patch.object(kit, "ROOT", root), patch.object(kit, "BOTS", root):
+                self.assertEqual(kit.cmd_loadtest(argparse.Namespace(url="http://127.0.0.1:12345", db="test", bots=2, duration=5)), 1)
+                self.assertEqual(report["verdict"], "FAIL")
+
     def test_fresh_bots_install_uses_frozen_lock(self):
         with patch.object(Path, "exists", return_value=False), patch.object(kit, "npm", return_value="npm"), \
                 patch.object(kit, "spacetime", return_value=["spacetime"]), patch.object(kit, "run") as run:

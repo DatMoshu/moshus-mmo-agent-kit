@@ -446,6 +446,9 @@ def cmd_loadtest(args) -> int:
     secs = max(1, report.get("duration_seconds", args.duration))
     report["updates_per_bot_per_sec"] = round(report.get("row_updates_received", 0) / max(1, report.get("bots_ready", 1)) / secs, 1)
     verdict, notes = "PASS", []
+    if res.returncode != 0:
+        verdict = "FAIL"
+        notes.append(f"bot harness exited {res.returncode}; partial metrics cannot pass")
     for key, rule in budgets["metrics"].items():
         val = report
         for part in key.split("."):
