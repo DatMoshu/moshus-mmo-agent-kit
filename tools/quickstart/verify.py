@@ -57,6 +57,18 @@ def reserve_port(port: int) -> int:
         return sock.getsockname()[1]
 
 
+def compact_path(path: str) -> str:
+    """Keep existing tools once; long inherited Windows PATHs break npm's cmd.exe scripts."""
+    seen = set()
+    result = []
+    for entry in path.split(os.pathsep):
+        key = os.path.normcase(os.path.normpath(entry))
+        if entry and key not in seen and Path(entry).is_dir():
+            seen.add(key)
+            result.append(entry)
+    return os.pathsep.join(result)
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--work-dir", type=Path, help="new directory for isolated state and evidence")
@@ -113,10 +125,15 @@ def main() -> int:
         node, npm, cargo = shutil.which("node"), shutil.which("npm"), shutil.which("cargo")
         if not all((node, npm, cargo)):
             raise RuntimeError("Install Node >=22 (with npm) and Rust via rustup; put node, npm and cargo on PATH")
+        if WIN:
+            env["PATH"] = compact_path(str(Path(node).parent) + os.pathsep + env.get("PATH", ""))
         if int(step("node-version", [node, "--version"]).strip().lstrip("v").split(".")[0]) < 22:
             raise RuntimeError("Node >=22 is required")
         rust = lock["toolchain"]["rust"]
         step("rust-version", [cargo, f"+{rust}", "--version"])
+        linker = shutil.which("link.exe") if WIN else None
+        if linker and "git" in [part.lower() for part in Path(linker).parts]:
+            raise RuntimeError("Git link.exe shadows the Microsoft linker. Run from Developer PowerShell for Visual Studio (C++ workload).")
         step("check", [sys.executable, "tools/kit.py", "check"])
         module = ROOT / lock["dev"]["module"]
         step("build", [cargo, f"+{rust}", "build", "--locked", "--target", "wasm32-unknown-unknown", "--release"], module)

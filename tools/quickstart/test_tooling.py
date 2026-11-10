@@ -4,6 +4,8 @@ import argparse
 import importlib.util
 from pathlib import Path
 import socket
+import os
+import tempfile
 import subprocess
 import unittest
 from unittest.mock import patch
@@ -23,6 +25,11 @@ verify = load("verify", TOOLS / "quickstart" / "verify.py")
 
 
 class ToolingTests(unittest.TestCase):
+    def test_path_compaction_preserves_existing_tools_once(self):
+        with tempfile.TemporaryDirectory() as directory:
+            path = os.pathsep.join([directory, str(Path(directory) / "missing"), directory])
+            self.assertEqual(verify.compact_path(path), directory)
+
     def test_compile_error_is_not_retried(self):
         failure = subprocess.CompletedProcess([], 1, "", "SyntaxError: invalid syntax")
         with patch.object(kit, "bots", return_value=failure) as bots:
