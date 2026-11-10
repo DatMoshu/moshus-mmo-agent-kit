@@ -17,8 +17,8 @@
 | This kit | see `LICENSE` and `NOTICE` at the kit root | Your game built from it is yours. |
 | Your module and client code | your choice | You own it. Generated bindings are part of your code. |
 
-The SpacetimeDB repository's root `LICENSE.txt` says that a subdirectory with its own LICENSE file is governed by that
-file. That is why SDKs and the module crate can be more permissive than the server. Always check the specific
+The SpacetimeDB repository's root `LICENSE.txt` describes subdirectory-specific licenses and also contains a
+conflict-precedence clause. Read the root and component texts together. That is why SDKs and the module crate can be more permissive than the server. Always check the specific
 subdirectory you use.
 
 ## Key terms in the Additional Use Grant (paraphrased)
@@ -62,6 +62,6 @@ subdirectory you use.
 
 ## Sources
 
-- SpacetimeDB license: <https://github.com/clockworklabs/SpacetimeDB/blob/master/LICENSE.txt>
+- SpacetimeDB license: <https://github.com/clockworklabs/SpacetimeDB/blob/v2.14.0/LICENSE.txt>
 - Business Source License FAQ (MariaDB): <https://mariadb.com/bsl-faq-adopting/>
 - AGPL v3: <https://www.gnu.org/licenses/agpl-3.0.html>

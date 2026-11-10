@@ -13,15 +13,28 @@ This product includes third-party material:
    `python tools/kit.py vendor-skills`.
 
 2. Godot SpacetimeDB SDK
-   Path:    templates/client/godot/addons/SpacetimeDB/
+   Paths:   templates/client/godot/addons/SpacetimeDB/
+            templates/client/godot-shard/addons/SpacetimeDB/
    Source:  https://github.com/flametime/Godot-SpacetimeDB-SDK
    License: MIT (copy in templates/client/godot/addons/SpacetimeDB/LICENSE)
    Copyright (c) 2025 flametime
+   Each copy retains its MIT LICENSE. Kit-specific changes and regression fixtures
+   may be present; these copies are not a claim of an unmodified upstream release.
 
-3. Ideas, not code, from BitCraftPublic
+3. Godot default project icons
+   Paths: templates/client/godot/icon.svg and templates/client/godot-shard/icon.svg
+   Source: https://github.com/godotengine/godot
+   License: MIT (copy in docs/legal/GODOT-LICENSE.txt)
+   Copyright (c) 2014-present Godot Engine contributors.
+   Copyright (c) 2007-2014 Juan Linietsky, Ariel Manzur.
+
+4. Ideas, not code, from BitCraftPublic
    Source:  https://github.com/clockworklabs/BitCraftPublic (Apache License 2.0)
    Some architecture notes (global + region databases, agent/scheduled-reducer
    patterns, handoff) are described in our own words. No BitCraft code is included.
+
+Package-manager dependencies are resolved separately through Cargo.lock and
+package-lock.json; see docs/legal/DEPENDENCIES.md for the inventory and release checks.
 
 SpacetimeDB itself (the server/host) is NOT included in this repository. It is licensed
 separately under the Business Source License 1.1 by Clockwork Laboratories, Inc.
