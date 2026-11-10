@@ -1,0 +1,45 @@
+name: Verify starter
+on: [push, pull_request, workflow_dispatch]
+permissions:
+  contents: read
+jobs:
+  clean-starter:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Install pinned toolchains
+        shell: bash
+        run: |
+          python - <<'PY'
+          import os, pathlib, tomllib
+          lock = tomllib.loads(pathlib.Path('stdb.lock').read_text())
+          with open(os.environ['GITHUB_ENV'], 'a') as out:
+              out.write('STDB_VERSION=' + lock['spacetimedb']['version'] + '\n')
+              out.write('RUST_VERSION=' + lock['toolchain']['rust'] + '\n')
+          PY
+      - name: Download official CLI and Rust
+        shell: bash
+        run: |
+          rustup toolchain install "$RUST_VERSION" --profile minimal --target wasm32-unknown-unknown
+          mkdir -p "$RUNNER_TEMP/stdb"
+          curl --fail --location --retry 2 "https://github.com/clockworklabs/SpacetimeDB/releases/download/v${STDB_VERSION}/spacetime-x86_64-unknown-linux-gnu.tar.gz" -o "$RUNNER_TEMP/stdb.tar.gz"
+          tar -xzf "$RUNNER_TEMP/stdb.tar.gz" -C "$RUNNER_TEMP/stdb"
+          echo "SPACETIME=$RUNNER_TEMP/stdb/spacetimedb-cli" >> "$GITHUB_ENV"
+      - name: Tooling regressions
+        run: python -m unittest discover -s tools/quickstart -p 'test_*.py' -v
+      - name: Build, generate, typecheck, publish and two-client smoke
+        run: python tools/quickstart/verify.py --work-dir "${{ runner.temp }}/verification"
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: starter-verification
+          path: |
+            ${{ runner.temp }}/verification/*.log
+            ${{ runner.temp }}/verification/receipt.json

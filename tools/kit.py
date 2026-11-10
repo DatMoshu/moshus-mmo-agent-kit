@@ -68,7 +68,8 @@ def say(msg: str) -> None:
 def run(cmd: list[str], cwd: Path | None = None, check: bool = True, capture: bool = False) -> subprocess.CompletedProcess:
     say("$ " + " ".join(shlex.quote(str(c)) for c in cmd) + (f"   (in {cwd})" if cwd else ""))
     return subprocess.run([str(c) for c in cmd], cwd=cwd, check=check, text=True, encoding="utf-8",
-                          errors="replace", capture_output=capture, shell=False)
+                          errors="replace", capture_output=capture, shell=False,
+                          creationflags=subprocess.CREATE_NO_WINDOW if IS_WIN else 0)
 
 
 class Transient(Exception):
@@ -342,15 +343,16 @@ def cmd_bindings(args) -> int:
 
 def ensure_bots() -> None:
     if not (BOTS / "node_modules").exists():
-        run([npm(), "install", "--no-audit", "--no-fund"], cwd=BOTS)
+        run([npm(), "ci", "--no-audit", "--no-fund"], cwd=BOTS)
     if not (BOTS / "src" / "module_bindings" / "index.ts").exists():
         run([*spacetime(), "generate", "--lang", "typescript", "--out-dir", str(BOTS / "src" / "module_bindings"),
              *module_source(ROOT / LOCK["dev"]["module"]), "--yes"])
 
 
 def bots(args_list: list[str], capture: bool = True) -> subprocess.CompletedProcess:
-    npx = which("npx") or sys.exit("npx not found")
-    return run([npx, "tsx", "src/main.ts", *args_list], cwd=BOTS, check=False, capture=capture)
+    node = which("node") or sys.exit("node not found")
+    return run([node, str(BOTS / "node_modules" / "tsx" / "dist" / "cli.mjs"),
+                "src/main.ts", *args_list], cwd=BOTS, check=False, capture=capture)
 
 
 def last_json(text: str) -> dict | None:
@@ -374,8 +376,8 @@ def bots_verdict(what: str, args_list: list[str]) -> tuple[dict | None, subproce
         res = bots(args_list)
         last[0] = res
         verdict = last_json(res.stdout or "")
-        if verdict is None:
-            raise Transient("no verdict from the bot harness")
+        if verdict is None and TRANSIENT.search((res.stdout or "") + (res.stderr or "")):
+            raise Transient("transient connection failure from the bot harness")
         return verdict, res
     try:
         return retry(what, once)
@@ -391,7 +393,7 @@ def cmd_smoke(args) -> int:
         return 1
     verdict, res = bots_verdict("smoke", ["--mode", "smoke", "--uri", ws_url(url), "--db", db])
     print(json.dumps(verdict, indent=2) if verdict else ((res.stdout or "") + (res.stderr or "")))
-    ok = bool(verdict) and verdict.get("verdict") == "PASS"
+    ok = res.returncode == 0 and bool(verdict) and verdict.get("verdict") == "PASS"
     if args.godot:
         ok = godot_smoke(url, db) and ok
     print("SMOKE", "PASS" if ok else "FAIL")
