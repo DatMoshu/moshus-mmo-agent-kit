@@ -822,9 +822,11 @@ func _route_play() -> void:
 				if dd < best:
 					best = dd
 					target = n
-			if target == null or since > 30000:
+			if since > 30000:
 				_set_phase("leave_town")
 				return
+			if target == null:
+				return # Town AOI may still be applying after the portal.
 			if best <= 1:
 				Net.send_move(Vector2i.ZERO)
 				if talk_nearest():

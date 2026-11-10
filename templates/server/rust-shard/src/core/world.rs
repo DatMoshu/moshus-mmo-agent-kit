@@ -174,7 +174,7 @@ pub fn ensure_world_inner(ctx: &ReducerContext, admin: Identity) {
                 admin,
                 admission_open: true,
                 tick_hz: TICK_HZ,
-                max_speed: MAX_SPEED,
+                max_speed: speed_or_default(Some(MAX_SPEED)), // the stored value is the one the tick uses
                 cell_size: CELL_SIZE,
                 world_half: WORLD_HALF,
                 schema_version: SCHEMA_VERSION,

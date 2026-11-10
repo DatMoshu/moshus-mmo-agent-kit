@@ -476,11 +476,12 @@ func _update_aoi(cell: Vector2i) -> void:
 		for dy in range(-AOI_RADIUS, AOI_RADIUS + 1):
 			wanted[Vector3i(_map, cell.x + dx, cell.y + dy)] = true
 	# Subscribe new cells first, then drop cells we left (no flicker).
+	# Our transform has a dedicated identity subscription; exclude it from cell subscriptions.
 	for c in wanted.keys():
 		if not _cell_subs.has(c):
 			var where := "map_id = %d AND cell_x = %d AND cell_y = %d" % [c.x, c.y, c.z]
 			_cell_subs[c] = client.subscribe(PackedStringArray([
-				"SELECT * FROM entity_transform WHERE " + where,
+				"SELECT * FROM entity_transform WHERE " + where + " AND identity != 0x" + my_identity.hex_encode(),
 				"SELECT * FROM npc WHERE " + where,
 				"SELECT * FROM monster WHERE " + where,
 				"SELECT * FROM ground_item WHERE " + where]))

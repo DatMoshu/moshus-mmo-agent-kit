@@ -89,6 +89,8 @@ pub fn tick_body(ctx: &ReducerContext, _row: TickSchedule) -> Result<(), String>
     let tick_count = health.tick_count + 1;
 
     let seeded = is_seeded(ctx);
+    // Movement speed of this database (task 1449): world_config.max_speed, MAX_SPEED when missing or invalid.
+    let speed = speed_or_default(ctx.db.world_config().id().find(0).map(|c| c.max_speed));
     // Online entities only (transform rows exist only while online), not every player ever.
     let online_now: Vec<EntityTransform> = ctx.db.entity_transform().iter().collect();
     let mut occ = build_occupancy(ctx, &online_now);
@@ -110,7 +112,8 @@ pub fn tick_body(ctx: &ReducerContext, _row: TickSchedule) -> Result<(), String>
             dy *= std::f32::consts::FRAC_1_SQRT_2;
         }
         let Some((w, h, exit_at_edge)) = map_dims(ctx, t.map_id) else { continue };
-        let (nx, ny) = (t.x + dx * MAX_SPEED * dt, t.y + dy * MAX_SPEED * dt);
+        let (sx, sy) = step_delta(dx, dy, speed, dt); // under one tile per axis (MAX_STEP)
+        let (nx, ny) = (t.x + sx, t.y + sy);
         let cur = tile_of(t.x, t.y);
         let (cur_tx, cur_ty) = cur;
         let (ntx, nty) = (nx.floor() as i32, ny.floor() as i32);
@@ -125,23 +128,13 @@ pub fn tick_body(ctx: &ReducerContext, _row: TickSchedule) -> Result<(), String>
                 continue;
             }
         }
-        // Collision with per-axis sliding: try the full step, then x only, then y only.
+        // Collision with per-axis sliding (rules::slide): try the full step, then x only, then y only.
         // A different tile must be walkable terrain AND free of bodies (players, NPCs, monsters).
         let map_id = t.map_id;
         let ok = |x: i32, y: i32| {
             (x == cur_tx && y == cur_ty) || (walkable(ctx, map_id, x, y, seeded) && !occ.has(map_id, (x, y)))
         };
-        // A diagonal step needs both orthogonal neighbours open (no squeezing between two walls).
-        let diag_ok = ntx == cur_tx || nty == cur_ty || (ok(ntx, cur_ty) && ok(cur_tx, nty));
-        let (x, y) = if ok(ntx, nty) && diag_ok {
-            (nx, ny)
-        } else if ok(ntx, cur_ty) {
-            (nx, t.y)
-        } else if ok(cur_tx, nty) {
-            (t.x, ny)
-        } else {
-            (t.x, t.y)
-        };
+        let (x, y) = slide(t.x, t.y, nx, ny, ok);
         let x = x.clamp(0.0, w as f32 - 0.001);
         let y = y.clamp(0.0, h as f32 - 0.001);
         let new_tile = tile_of(x, y);
