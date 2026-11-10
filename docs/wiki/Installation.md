@@ -1,5 +1,8 @@
 # Installation
 
+On Linux, use `python3` wherever these examples show `python` if your distribution does not install the `python` alias.
+
+
 The minimal path uses the Rust movement world and TypeScript bots. It needs no Godot editor, cloud account, private fleet service, or game assets. Initial tool/package downloads require network access. Work from a clone and run commands at its root.
 
 | Tool | Pin or minimum | Why |
