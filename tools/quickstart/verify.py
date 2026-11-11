@@ -10,6 +10,7 @@ build outputs and receipt.json. No fleet services, credentials or prebuilt wasm 
 from __future__ import annotations
 
 import argparse
+from contextlib import contextmanager
 import hashlib
 import json
 import os
@@ -37,9 +38,15 @@ def process_options() -> dict:
 def stop_owned(proc: subprocess.Popen) -> None:
     if proc.poll() is not None:
         return
+    tree_error = None
     if WIN:
-        subprocess.run(["taskkill", "/PID", str(proc.pid), "/T", "/F"],
-                       capture_output=True, **process_options())
+        try:
+            result = subprocess.run(["taskkill", "/PID", str(proc.pid), "/T", "/F"],
+                                    capture_output=True, timeout=10, **process_options())
+            if result.returncode:
+                tree_error = RuntimeError("Owned process tree cleanup failed: taskkill exit " + str(result.returncode))
+        except (OSError, subprocess.TimeoutExpired) as exc:
+            tree_error = exc
     else:
         os.killpg(proc.pid, signal.SIGTERM)
     try:
@@ -50,10 +57,179 @@ def stop_owned(proc: subprocess.Popen) -> None:
         else:
             os.killpg(proc.pid, signal.SIGKILL)
         proc.wait()
+    if not WIN:
+        # The session leader may exit before a descendant that ignores SIGTERM.
+        try:
+            os.killpg(proc.pid, signal.SIGKILL)
+        except ProcessLookupError:
+            pass
+    if tree_error is not None:
+        raise tree_error
+
+
+@contextmanager
+def owning(proc: subprocess.Popen):
+    """Keep cancellation/other wait exceptions intact even if cleanup also fails."""
+    try:
+        yield proc
+    finally:
+        original = sys.exception()
+        try:
+            stop_owned(proc)
+        except BaseException as exc:
+            if original is None:
+                raise
+            original.add_note(f"Owned process {proc.pid} cleanup failed: {exc}")
+
+
+def windows_parents() -> dict[int, int]:
+    """Read-only Toolhelp process snapshot; never open or control foreign processes."""
+    import ctypes as c
+    from ctypes import wintypes as w
+
+    class Entry(c.Structure):
+        _fields_ = [("size", w.DWORD), ("usage", w.DWORD), ("pid", w.DWORD),
+                    ("heap", c.c_size_t), ("module", w.DWORD), ("threads", w.DWORD),
+                    ("parent", w.DWORD), ("priority", w.LONG), ("flags", w.DWORD),
+                    ("exe", w.WCHAR * 260)]
+
+    kernel = c.WinDLL("kernel32", use_last_error=True)
+    kernel.CreateToolhelp32Snapshot.argtypes = [w.DWORD, w.DWORD]
+    kernel.CreateToolhelp32Snapshot.restype = w.HANDLE
+    kernel.Process32FirstW.argtypes = kernel.Process32NextW.argtypes = [w.HANDLE, c.POINTER(Entry)]
+    kernel.CloseHandle.argtypes = [w.HANDLE]
+    handle = kernel.CreateToolhelp32Snapshot(2, 0)  # TH32CS_SNAPPROCESS
+    if handle == c.c_void_p(-1).value:
+        raise c.WinError(c.get_last_error())
+    parents = {}
+    try:
+        entry = Entry()
+        entry.size = c.sizeof(entry)
+        ok = kernel.Process32FirstW(handle, c.byref(entry))
+        while ok:
+            parents[entry.pid] = entry.parent
+            ok = kernel.Process32NextW(handle, c.byref(entry))
+        if c.get_last_error() != 18:  # ERROR_NO_MORE_FILES
+            raise c.WinError(c.get_last_error())
+    finally:
+        kernel.CloseHandle(handle)
+    return parents
+
+
+def owned_pids(proc: subprocess.Popen) -> set[int]:
+    if proc.poll() is not None:
+        raise RuntimeError("Server exited during ownership inspection; see server.log")
+    if WIN:
+        parents = windows_parents()
+    elif sys.platform == "linux":
+        parents = {}
+        for path in Path("/proc").glob("[0-9]*/stat"):
+            try:
+                # comm can contain spaces and parentheses; ppid follows the final ')'.
+                parents[int(path.parent.name)] = int(path.read_text().rsplit(")", 1)[1].split()[1])
+            except FileNotFoundError:
+                continue
+    else:
+        raise RuntimeError("Listener ownership inspection supports Windows and Linux only")
+    result = {proc.pid}
+    while True:
+        children = {pid for pid, parent in parents.items() if parent in result}
+        if children <= result:
+            return result
+        result.update(children)
+
+
+def listener_owners(port: int, pids: set[int]) -> set[int]:
+    """Return every listener owner on this port, conservatively including other IPs.
+
+    Unknown/unreadable ownership is an error, never evidence of readiness.
+    Linux maps socket inodes only through the owned tree's descriptors.
+    """
+    if WIN:
+        import ctypes as c
+        api = c.WinDLL("iphlpapi").GetExtendedTcpTable
+        api.argtypes = [c.c_void_p, c.POINTER(c.c_uint32), c.c_int,
+                        c.c_uint32, c.c_uint32, c.c_uint32]
+        owners = set()
+        for family, width, port_index, pid_index in ((2, 6, 2, 5), (23, 14, 5, 13)):
+            size = c.c_uint32()
+            status = api(None, c.byref(size), False, family, 3, 0)  # OWNER_PID_LISTENER
+            if status != 122:  # ERROR_INSUFFICIENT_BUFFER
+                raise RuntimeError(f"Cannot inspect TCP listener ownership: Windows error {status}")
+            for attempt in range(3):
+                buf = c.create_string_buffer(size.value)
+                status = api(buf, c.byref(size), False, family, 3, 0)
+                if status != 122:
+                    break
+            if status:
+                raise RuntimeError(f"Cannot inspect TCP listener ownership: Windows error {status}")
+            words = c.cast(buf, c.POINTER(c.c_uint32))
+            for index in range(words[0]):
+                offset = 1 + index * width
+                if socket.ntohs(words[offset + port_index] & 0xffff) == port:
+                    owners.add(words[offset + pid_index])
+        return owners
+    if sys.platform != "linux":
+        raise RuntimeError("Listener ownership inspection supports Windows and Linux only")
+    inodes = set()
+    for name in ("tcp", "tcp6"):
+        path = Path("/proc/net") / name
+        if name == "tcp6" and not path.exists():
+            continue  # kernel with IPv6 disabled
+        for line in path.read_text().splitlines()[1:]:
+            fields = line.split()
+            if fields[3] == "0A" and int(fields[1].rsplit(":", 1)[1], 16) == port:
+                inodes.add(fields[9])
+    found = set()
+    owners = set()
+    for pid in pids:
+        try:
+            descriptors = list((Path("/proc") / str(pid) / "fd").iterdir())
+        except FileNotFoundError:
+            continue
+        for fd in descriptors:
+            try:
+                target = os.readlink(fd)
+            except FileNotFoundError:
+                continue
+            if target.startswith("socket:[") and target[8:-1] in inodes:
+                found.add(target[8:-1])
+                owners.add(pid)
+    if found != inodes:
+        raise RuntimeError("Listener ownership conflict: port has a foreign or unidentifiable listener")
+    return owners
+
+
+def assert_owned_listener(proc: subprocess.Popen, port: int) -> bool:
+    pids = owned_pids(proc)
+    owners = listener_owners(port, pids)
+    if owners - pids:
+        raise RuntimeError("Listener ownership conflict: port belongs to a foreign process")
+    if proc.poll() is not None:
+        raise RuntimeError("Server exited during ownership inspection; see server.log")
+    return bool(owners)
+
+
+def wait_for_owned_server(proc: subprocess.Popen, port: int) -> None:
+    deadline = time.monotonic() + 45
+    while True:
+        if assert_owned_listener(proc, port):
+            try:
+                with urllib.request.urlopen(f"http://127.0.0.1:{port}/v1/ping", timeout=1):
+                    pass
+            except OSError:
+                pass
+            else:
+                # Inspection errors must propagate, including permission failures.
+                if assert_owned_listener(proc, port):
+                    return
+        if time.monotonic() >= deadline:
+            raise RuntimeError("Server startup timed out; see server.log")
+        time.sleep(0.2)
 
 
 def reserve_port(port: int) -> int:
-    # Fail before launching anything if the requested port is already in use.
+    # Choose/check the port immediately before launching the server.
     with socket.socket() as sock:
         sock.bind(("127.0.0.1", port))
         return sock.getsockname()[1]
@@ -109,11 +285,11 @@ def main() -> int:
         with path.open("w", encoding="utf-8") as log:
             proc = subprocess.Popen(command, cwd=cwd, env=env, stdout=log,
                                     stderr=subprocess.STDOUT, **process_options())
-            try:
-                code = proc.wait(timeout=timeout)
-            except subprocess.TimeoutExpired:
-                stop_owned(proc)
-                code = 124
+            with owning(proc):
+                try:
+                    code = proc.wait(timeout=timeout)
+                except subprocess.TimeoutExpired:
+                    code = 124
         receipt["steps"].append({"step": name, "command": command, "cwd": str(cwd),
                                  "exit_code": code, "seconds": round(time.monotonic() - t0, 3), "log": path.name})
         output = path.read_text(encoding="utf-8", errors="replace")
@@ -124,9 +300,6 @@ def main() -> int:
     try:
         receipt["git_sha"] = step("revision", ["git", "rev-parse", "HEAD"]).strip()
         receipt["git_status_before"] = step("source-status", ["git", "status", "--porcelain"]).strip()
-        port = reserve_port(args.port)
-        url = f"http://127.0.0.1:{port}"
-        receipt["url"] = url
         cli = os.environ.get("SPACETIME") or shutil.which("spacetime")
         if not cli:
             raise RuntimeError(f"Install SpacetimeDB {lock['spacetimedb']['version']} or set SPACETIME to its CLI")
@@ -164,22 +337,18 @@ def main() -> int:
         if tracked:
             step("bindings-drift", ["git", "diff", "--exit-code", "--", "tools/loadtest/bots/src/module_bindings"])
         step("typecheck", [node, str(bots / "node_modules/typescript/bin/tsc"), "--noEmit"], bots)
+        port = reserve_port(args.port)
+        url = f"http://127.0.0.1:{port}"
+        receipt["url"] = url
         server_cmd = [*cli_cmd, "start", "--listen-addr", f"127.0.0.1:{port}", "--data-dir", str(work / "data")]
         server_log = (work / "server.log").open("w", encoding="utf-8")
         server = subprocess.Popen(server_cmd, cwd=ROOT, env=env, stdout=server_log,
                                   stderr=subprocess.STDOUT, **process_options())
         receipt["server"] = {"command": server_cmd, "pid": server.pid}
-        deadline = time.monotonic() + 45
-        while True:
-            if server.poll() is not None:
-                raise RuntimeError("Server exited during startup; see server.log")
-            try:
-                with urllib.request.urlopen(url + "/v1/ping", timeout=1):
-                    break
-            except OSError:
-                if time.monotonic() >= deadline:
-                    raise RuntimeError("Server startup timed out; see server.log")
-                time.sleep(0.2)
+        wait_for_owned_server(server, port)
+        if not assert_owned_listener(server, port):
+            raise RuntimeError("Owned server listener disappeared before publish")
+        receipt["server"]["listener_ownership"] = "verified process tree before publish"
         step("publish", [*cli_cmd, "publish", "kit-verify", "--server", url, "--bin-path", str(wasm), "--yes"])
         step("smoke", [sys.executable, "tools/kit.py", "smoke", "--url", url, "--db", "kit-verify"], timeout=90)
         if args.loadtest:
@@ -191,7 +360,8 @@ def main() -> int:
         print(str(exc), file=sys.stderr)
     finally:
         if server is not None:
-            stop_owned(server)
+            with owning(server):
+                pass
             receipt["server"]["exit_code"] = server.returncode
         if server_log is not None:
             server_log.close()
