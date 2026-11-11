@@ -10,6 +10,8 @@ talking NPCs, a portal, monsters, safe zones and respawns.
     python tools/shard/fixture_game.py write OUT.json      # write the document
     python tools/shard/fixture_game.py live --db fixture-dev [--url URL] [--publish]
         # (optionally publish the core module to a separate DB,) seed it, then verify the seeded rows with SQL
+    python tools/shard/fixture_game.py live --db fixture-dev --godot GODOT --logs EVIDENCE_DIR
+        # two concurrent clients, each with isolated user data and a complete output log
 
 `live` needs the spacetime CLI ($SPACETIME, $SPACETIME_ARGS) logged in as the database owner.
 """
@@ -197,6 +199,7 @@ def main() -> int:
     lv.add_argument("--godot", help="also run two Godot clients (--world, --route portal) against the fixture DB")
     lv.add_argument("--renderer", choices=["2d", "3d"], default="2d", help="client renderer for --godot")
     lv.add_argument("--shots", help="(needs a display) client 1 saves 2D+3D stills of both maps here; local only")
+    lv.add_argument("--logs", help="retain complete Godot client output in this external evidence directory")
     a = ap.parse_args()
     doc = build()
     errs = check(doc)
@@ -236,37 +239,82 @@ def godot_route(a, doc: dict) -> bool:
     """Two headless clients walk spawn -> village portal -> meet each other and the NPCs -> off the west edge."""
     import tempfile
     if not (CLIENT / ".godot").exists():  # fresh checkout: class_names resolve only after a first import
-        subprocess.run([a.godot, "--headless", "--path", str(CLIENT), "--import"], capture_output=True, timeout=300)
+        subprocess.run([a.godot, "--headless", "--path", str(CLIENT), "--import"],
+                       capture_output=True, timeout=300, check=True,
+                       creationflags=subprocess.CREATE_NO_WINDOW if os.name == "nt" else 0)
     world = Path(tempfile.mkdtemp(prefix="fixture-")) / "meadowmere.json"
     world.write_text(json.dumps(doc), encoding="utf-8")
     npcs = sum(1 for n in doc["npcs"] if n["map_id"] == VILLAGE)
-    base = [a.godot, "--headless", "--path", str(CLIENT), "--", "--autopilot", "--route", "portal",
+    base = [a.godot, "--headless", "--max-fps", "60", "--path", str(CLIENT), "--", "--autopilot", "--route", "portal",
             "--world", str(world), "--url", a.url, "--db", a.db, "--seconds", "60", "--expect-npcs", str(npcs),
             "--renderer", getattr(a, "renderer", "2d")]
     procs = []
-    tag = os.urandom(2).hex()  # fresh identities each run; names are unique per server
-    for i in (1, 2):
-        shots = ["--shots", a.shots] if getattr(a, "shots", None) and i == 1 else []
-        cmd = base + ["--name", f"Meadow{i}_{tag}"] + shots
-        if shots:  # stills need a real display: drop --headless (run under xvfb-run on a server)
-            cmd.remove("--headless")
-        procs.append(subprocess.Popen(cmd, stdout=subprocess.PIPE,
-                                      stderr=subprocess.STDOUT, text=True))
-        time.sleep(1.0)
-    ok = True
-    for i, p in enumerate(procs, 1):
-        try:
-            out, _ = p.communicate(timeout=120)
-        except subprocess.TimeoutExpired:  # never leave a hung headless client behind
-            for q in procs:
-                q.kill()
-            out, _ = p.communicate()
-            out += "\nAUTOPILOT FAIL fixture client timed out"
-        lines = [l for l in out.splitlines() if l.startswith(("AUTOPILOT", "SOURCE", "SCRIPT ERROR"))]
-        print(f"[fixture client {i}] exit={p.returncode}\n  " + "\n  ".join(lines))
-        ok &= p.returncode == 0 and any(l.startswith("AUTOPILOT PASS") for l in lines)
+    outputs = []
+    try:
+        launches = []
+        logs = Path(a.logs) if getattr(a, "logs", None) else world.parent
+        logs.mkdir(parents=True, exist_ok=True)
+        tag = os.urandom(2).hex()  # fresh identities each run; names are unique per server
+        for i in (1, 2):
+            shots = ["--shots", a.shots] if getattr(a, "shots", None) and i == 1 else []
+            cmd = base + ["--name", f"Meadow{i}_{tag}"] + shots
+            if shots:  # stills need a real display: drop --headless (run under xvfb-run on a server)
+                cmd.remove("--headless")
+            # Godot's user settings/logs are shared by project name unless the OS data root
+            # is isolated. A fixture must never read a real player's settings or identity.
+            env = dict(os.environ)
+            user_root = (Path(a.logs) if getattr(a, "logs", None) else world.parent) / f"user-{i}"
+            user_root.mkdir(parents=True, exist_ok=True)
+            env.update(APPDATA=str(user_root), XDG_DATA_HOME=str(user_root), XDG_CONFIG_HOME=str(user_root))
+            hidden = {"creationflags": subprocess.CREATE_NO_WINDOW} if os.name == "nt" else {}
+            launched = time.monotonic()
+            output = (logs / f"client-{i}.log").open("w", encoding="utf-8")
+            outputs.append(output)
+            procs.append(subprocess.Popen(cmd, stdout=output, env=env,
+                                          stderr=subprocess.STDOUT, text=True, **hidden))
+            launches.append({"client": i, "pid": procs[-1].pid, "command": cmd,
+                             "launch_seconds": time.monotonic() - launched, "started_at": time.time()})
+            if getattr(a, "logs", None):
+                (Path(a.logs) / "launches.json").write_text(json.dumps(launches, indent=2), encoding="utf-8")
+            time.sleep(1.0)
+        ok = True
+        for i, p in enumerate(procs, 1):
+            timed_out = False
+            try:
+                p.wait(timeout=120)
+            except subprocess.TimeoutExpired:  # never leave a hung headless client behind
+                for q in procs:
+                    if q.poll() is None:
+                        if os.name == "nt":
+                            subprocess.run(["taskkill", "/PID", str(q.pid), "/T", "/F"],
+                                           capture_output=True, creationflags=subprocess.CREATE_NO_WINDOW)
+                        else:
+                            q.kill()
+                        q.wait()
+                timed_out = True
+            outputs[i - 1].close()
+            out = (logs / f"client-{i}.log").read_text(encoding="utf-8", errors="replace")
+            if timed_out:
+                out += "\nAUTOPILOT FAIL fixture client timed out"
+            lines = [l for l in out.splitlines() if l.startswith(("AUTOPILOT", "SOURCE", "SCRIPT ERROR"))]
+            print(f"[fixture client {i}] exit={p.returncode}\n  " + "\n  ".join(lines))
+            ok &= (not timed_out and p.returncode == 0
+                   and any(l.startswith("AUTOPILOT PASS") for l in lines)
+                   and not any(l.startswith(("SCRIPT ERROR", "AUTOPILOT FAIL")) for l in lines))
+    finally:
+        for proc in procs:
+            if proc.poll() is None:
+                if os.name == "nt":
+                    subprocess.run(["taskkill", "/PID", str(proc.pid), "/T", "/F"],
+                                   capture_output=True, creationflags=subprocess.CREATE_NO_WINDOW)
+                else:
+                    proc.kill()
+                proc.wait()
+        for output in outputs:
+            output.close()
     world.unlink()
-    world.parent.rmdir()
+    if getattr(a, "logs", None):
+        world.parent.rmdir()
     print(f"FIXTURE {'PASS' if ok else 'FAIL'} godot route=portal world=meadowmere renderer={getattr(a, 'renderer', '2d')}")
     return ok
 
