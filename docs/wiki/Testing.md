@@ -31,3 +31,18 @@ Run `python tools/quickstart/verify.py` in a disposable clean clone; use `--load
 A candidate needs a new checkout without generated caches/prebuilt artifacts, installation from committed lockfiles, isolated endpoint/config/data, source build, and two observers. Record first-run and warm-run times separately and disclose installation/network exclusions. Clean up only owned processes. Do not wipe valuable databases or stop another developer's server for a port.
 
 KIT_WASM helps diagnose runtime setup but cannot prove local source builds. Platform claims must name the platform actually run. Missing tooling or blocked downloads are skipped/blocked with a reason, never PASS.
+
+## Concurrent client harnesses
+
+Give each client its own user-data directory and output file. Starting two
+processes does not prove that they run concurrently: if both write to stdout pipes
+but the harness drains only one, the other can block when its pipe fills. This
+produced a real false-negative portal/peer test during release preparation.
+The shard fixture now writes per-client files and retains complete output with
+`--logs <external-directory>`. Require both clients to observe each other; do not
+replace that assertion with two independent successful joins.
+
+The fixture rejects nonzero exits, timeouts and script errors even if output also
+contains a PASS marker. Mutation checks in a disposable copy can demonstrate that
+a focused regression catches the old defect: restore only the faulty behavior,
+confirm failure, then restore the fix and rerun. Retain all three results.
