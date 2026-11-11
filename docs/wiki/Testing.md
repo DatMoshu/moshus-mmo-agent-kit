@@ -32,6 +32,21 @@ A candidate needs a new checkout without generated caches/prebuilt artifacts, in
 
 KIT_WASM helps diagnose runtime setup but cannot prove local source builds. Platform claims must name the platform actually run. Missing tooling or blocked downloads are skipped/blocked with a reason, never PASS.
 
+## Process and endpoint ownership
+
+An HTTP ping proves that a service answered, not that it belongs to the test.
+The quickstart checks listener ownership against its launched process tree on
+Windows and Linux before publishing. It fails if ownership cannot be established
+or a competing listener occupies the port. Other platforms are unsupported by
+this ownership check. A free-port check alone is insufficient because another
+process can bind between the check and startup.
+
+Every started verification step has a cleanup scope that also runs when its wait
+is interrupted. Regression tests must include a real live child, a competing
+listener, and a positive owned-listener control. Mocked exit codes alone cannot
+prove process cleanup or endpoint ownership. This protects ordinary local test
+isolation; it is not a security boundary against hostile local processes.
+
 ## Concurrent client harnesses
 
 Give each client its own user-data directory and output file. Starting two
