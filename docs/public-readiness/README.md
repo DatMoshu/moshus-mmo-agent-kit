@@ -1,15 +1,50 @@
 # Release-preparation validation scope
 
-The reproducible minimal gate is [tools/quickstart/verify.py](../../tools/quickstart/verify.py). Run it in a disposable clone with the pinned prerequisites already installed. Its receipt/logs remain external; sanitize paths and credentials before making any evidence public.
+The minimal gate is [tools/quickstart/verify.py](../../tools/quickstart/verify.py).
+Run it in a disposable clone with pinned prerequisites. Receipts/logs remain
+external; sanitize local paths and credentials before publishing evidence.
 
-## Observed during preparation, 2026-11-10
+## Measured preparation runs, 2026-11-10
 
-A fresh Windows checkout at `66df845` completed a Rust 1.97.1 source build for Wasm, locked npm install, fresh TypeScript bot binding generation, typecheck, isolated local publish, two-identity movement smoke, and a 10-bot/five-second diagnostic. The runtime worker's retained receipt recorded PASS in **49.406 seconds**. This measured run excludes toolchain installation and does not establish a universal setup time. A subsequent revision adds richer receipt metadata and requires its own final-candidate run.
+| Host and revision | Actual result | Timing and limit |
+|---|---|---|
+| Windows 11, `45265be` | Source-built rust-single Wasm, locked npm install, fresh bot bindings/typecheck, isolated publish, two-client smoke, 10-bot/5-second load: PASS | 54.062 seconds including cold dependency downloads/build; prerequisites excluded |
+| Dell PC, Debian 13 x86_64, `59e7d13` | Source build, fresh bot bindings/typecheck, isolated publish and two-client smoke: PASS | 68.579 seconds including the separate failed load diagnostic below; cold build 47.853 seconds |
+| Same Dell run, optional 10-bot/5-second load | **FAIL**: p95 393.5 ms, p99 522.8 ms against 150/400 ms failure limits | All 10 bots joined, zero reducer errors, tick-health level 0; this does not override latency failure |
 
-Windows source builds need the Visual Studio C++ workload and a developer environment with the Microsoft linker. The initial ordinary-shell attempt exposed Git link.exe shadowing; runner diagnostics now identify that case. Initial npm execution also required inherited PATH normalization. These are prerequisite/environment findings, not engine-client validation.
+The Dell began without Git, Rust, Node, SpacetimeDB or a C compiler. Isolated
+user-local prerequisites took 41.43 seconds to download/extract/install, measured
+separately. Rust 1.97.1 and STDB 2.14.0 remained pinned; Node was 22.18.0. Zig
+0.14.1 supplied the host C linker because the machine had no system compiler or
+passwordless sudo. This was a test-host accommodation, not a new kit dependency.
+The runner used new Cargo/npm/build directories and a local Git-bundle clone;
+no cached Wasm, generated bindings, fleet server or private package registry was
+needed. The Debian kernel was 6.12.113, Python 3.13.5, with two logical CPUs.
 
-The authored [Linux CI workflow](../../.github/workflows/verify.yml) has not been executed on hosted GitHub Actions as part of this documentation worker's review. Historical Linux runtime results remain in [VERIFICATION.md](../VERIFICATION.md). Godot, Unity editor, Unreal, macOS, sharded handoff and tile-world behavior are outside this minimal Windows movement-path result. The lead's final candidate report must identify any additional fresh checks and their exact source revision.
+These are measured runs at the named commits, not universal setup-time or capacity
+claims. The retained release report binds the final candidate to its own fresh
+clone result. Keep the earlier failed latency result even if another run passes.
 
-## Release review
+## Issues found by fresh runs
 
-See [testing](../wiki/Testing.md) for the proof contract, [release maintenance](../wiki/Release-maintenance.md) for publication/wiki preparation, and [dependency inventory](../legal/DEPENDENCIES.md) for license evidence. Documentation and source review do not substitute for runtime qualification. Re-run the gate at the actual release SHA and retain its receipt, logs, tool versions, clean-checkout status, and all skipped checks.
+Windows needs the Visual Studio C++ workload and developer environment. The
+ordinary-shell attempt exposed Git link.exe shadowing the Microsoft linker;
+the runner now identifies it. npm also required inherited PATH normalization.
+The CLI now installs locked packages and uses installed tsx rather than allowing
+npx to download a tool implicitly. Smoke and load gates reject failed process
+exits even if partial JSON looks successful.
+
+The [Linux CI workflow](../../.github/workflows/verify.yml) is authored but has not
+run on hosted GitHub Actions. Its exact environment-export snippet was executed
+locally and checked for two newline-delimited pinned variables. Historical
+engine/platform results remain in [VERIFICATION.md](../VERIFICATION.md). macOS,
+Unity editor, Unreal compilation and current multi-database handoff are not part
+of this fresh minimal-path proof.
+
+## Review and repeat
+
+See [testing](../wiki/Testing.md), [release maintenance](../wiki/Release-maintenance.md)
+and [dependency inventory](../legal/DEPENDENCIES.md). Re-run at the release SHA,
+retain commands, receipt, logs, versions and clean-checkout status, and state all
+skipped checks. A successful source build does not establish client correctness,
+production scale or licensing compliance.

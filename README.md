@@ -7,7 +7,7 @@ For developers working with a coding agent: start with a small movement world, p
 [Start here](docs/wiki/Installation.md) | [Documentation](docs/wiki/Home.md) | [Template guide](docs/wiki/Server-and-client-templates.md) | [Contributing](CONTRIBUTING.md) | [Security](SECURITY.md)
 
 ```mermaid
-flowchart LR
+flowchart TB
     A[Player or bot] -->|join and movement intent| R[Reducers: admission and validation]
     R --> I[Private input rows]
     I --> T[Scheduled movement tick]
@@ -59,7 +59,7 @@ The smoke harness uses the real SDK and subscriptions: two identities join, send
 | [unreal](templates/client/unreal) | Thin C++ starter | Generated bindings and source review; **not compiled** |
 | [sidecar](templates/sidecar) | External Node helper and health-guard pattern | Historical local census check; game-specific AI remains your work |
 
-These are summaries of dated records in [VERIFICATION.md](docs/VERIFICATION.md), not results from the current checkout. A fresh Windows movement-path source build and smoke was also exercised during [release preparation](docs/public-readiness/README.md). [Validation policy](docs/wiki/Testing.md) explains what to rerun and how to report fresh evidence. macOS has no recorded runtime proof in that log.
+These are summaries of dated records in [VERIFICATION.md](docs/VERIFICATION.md), not results from the current checkout. Fresh Windows and Dell Linux movement-path source builds and smoke tests were exercised during [release preparation](docs/public-readiness/README.md); the Dell optional load diagnostic failed its latency limits. [Validation policy](docs/wiki/Testing.md) explains what to rerun and how to report fresh evidence. macOS has no recorded runtime proof in that log.
 
 ## Make it yours
 

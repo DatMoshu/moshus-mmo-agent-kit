@@ -36,6 +36,13 @@ tools or modified dependencies, inspect the package's actual license and source
 availability obligations. Review the resulting browser bundle separately from
 the development dependency tree.
 
+The fresh rust-single download contained 77 package manifests. Seven SpacetimeDB
+packages declare a license-file rather than an SPDX label; all seven downloaded
+LICENSE files were present and contained the Apache-2.0 text. Other declared
+choices include MIT, Apache-2.0, Unicode-3.0, BSD, Zlib, CC0, Unlicense and BSL-1.0
+(the Boost license, distinct from the server Business Source License). This is
+a manifest/text inventory of that build, not an audit of every optional template.
+
 Rust lockfiles do not contain license texts. After fetching pinned packages, run
 `cargo metadata --locked --format-version 1` in each module and inspect the license
 and license-file entries of every dependency; retain notices for the artifacts
